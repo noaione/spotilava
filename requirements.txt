@@ -1,0 +1,8 @@
+# librespot
+-e git+https://github.com/kokarare1212/librespot-python.git@3dcf52608bb94e72ccefcf789a84b5452ef38966#egg=librespot
+sanic==21.9.1
+python-dotenv==0.19.1
+mutagen==1.45.1
+
+# logging
+coloredlogs==15.0.1
