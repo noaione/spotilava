@@ -30,8 +30,8 @@ To use this webserver, you need to prepare a python virtual environment.
    - More info: [Configuration](#configuration)
 6. Start the server with `python3 app.py`, make sure you're in the virtualenv.
 7. Start requesting with Lavalink with this URL format:
-   - `https://127.0.0.1:37784/TRACK_ID/listen`
-   - `TRACK_ID` need to be changed into Spotify hex ID, for example:
+   - `https://127.0.0.1:37784/:track_id/listen`
+   - `:track_id` need to be changed into Spotify hex ID, for example:
      - The link `https://open.spotify.com/track/5erw0k8hLca8iP36AhFMsE` will have the track ID of: `5erw0k8hLca8iP36AhFMsE`
 
 ## Configuration
@@ -44,10 +44,14 @@ In `.env.example` you will find 3 options:
 
 ## API Route
 
-- `/<track_id>` fetch the metadata of the track ID. (JSON)
-- `/<track_id>/listen` fetch the track itself, returns the OGG Vorbis stream. (Binary)
-- `/album/<album_id>/` get the list of Album data. (JSON)
-- `/playlist/<playlist_id>` get the list of playlist data. (JSON)
+- `/:track_id` fetch the metadata of the track ID. (JSON)
+- `/:track_id/listen` fetch the track itself, returns the OGG Vorbis stream. (Binary)
+- `/album/:album_id/` get the list of Album data. (JSON)
+- `/playlist/:playlist_id` get the list of playlist data. (JSON)
+
+The other API can be used to fetch about playlist/album/track information before requesting lavaplayer the real URL (`/:track_id/listen`).
+
+I'm planning to implement support for Shows/Podcast too.
 
 ## How it works?
 
