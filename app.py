@@ -118,29 +118,13 @@ async def get_track_metadata(request: sanic.Request, track_id: str) -> HTTPRespo
             status=500
         )
 
-    metadata = await app.spotify.get_track(track_id)
+    metadata = await app.spotify.get_track_metadata(track_id)
     if metadata is None:
         logger.warning(f"TrackMeta: Unable to find track <{track_id}>")
         return json({"error": "Track not found.", "code": 404, "data": None}, status=404)
-    if metadata.track is None:
-        logger.warning(f"TrackListen: Unable to find track <{track_id}>, track meta is missing")
-        return json({"error": "Track not found, possibly not a track?", "code": 404, "data": None}, status=404)
-
-    track_meta = metadata.track
-    metadata = {
-        "id": track_id,
-        "title": track_meta.name,
-        "album": track_meta.album.name,
-        "duration": track_meta.duration,
-    }
-
-    artists = []
-    for artist in track_meta.artist:
-        artists.append(artist.name)
-    metadata["artists"] = artists
 
     logger.info(f"TrackMeta: Sending track <{track_id}> metadata")
-    return json({"error": "Success", "code": 200, "data": metadata}, status=200, ensure_ascii=False)
+    return json({"error": "Success", "code": 200, "data": metadata.to_json()}, status=200, ensure_ascii=False)
 
 
 @app.get("/<track_id>/listen")

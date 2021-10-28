@@ -320,6 +320,25 @@ class LIBRESpotifyWrapper:
                     merged_items.extend(res.get("items", []))
         return merged_items
 
+    async def get_track_metadata(self, track_id: str) -> Optional[SpotifyTrack]:
+        token = await self._get_token()
+
+        header_token = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        async with aiohttp.ClientSession(headers=header_token) as client:
+            self.logger.info(f"Spotify: Requesting <{track_id}> into Tracks API")
+            async with client.get(f"https://api.spotify.com/v1/tracks/{track_id}") as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+
+        if data:
+            return SpotifyTrack.from_track(data)
+        return None
+
     async def get_album(self, album_id: str) -> Optional[SpotifyAlbum]:
         token = await self._get_token()
 
