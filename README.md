@@ -64,6 +64,24 @@ The program will then request the input stream of the file with `librespot-pytho
 3. Return a stream response with [Sanic](https://sanicframework.org/en/guide/advanced/streaming.html#response-streaming) which will send the injected bytes then the remainder of the file.
 4. Lavaplayer will happily accept the data and not broke apart hopefully.
 
+## Current Problems
+
+1. Lavalink/Lavaplayer cannot parse the correct duration, so you need a way to inject the correct metadata in your bot.
+
+![Showcase #1](https://p.ihateani.me/ryxzjpok.png)
+
+Lavaplayer would just return an `UNDEFINED_LENGTH` a.k.a the longest number you can put on Java.
+
+2. librespot sometimes failed with error: `spotify.APReponseMessage`
+
+I cannot fix this currently since this is most likely a failure from `librespot-python` itself. You can just start the server again to see if it's works.
+
+3. Spotify would froze at `Created new session! device_id xxxxxxxxx` and not finished connecting.
+
+This problem is unknown to me currently, this would also make your terminal (in Windows?) cannot be stopped, you need to close the whole terminal.
+
+Just rerun the `app.py` again and see if it would froze at that section again.
+
 ## License
 
 This project is licensed with [MIT License]([LICENSE](https://github.com/noaione/spotilava/blob/master/LICENSE)).
