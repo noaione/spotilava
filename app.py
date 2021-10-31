@@ -160,14 +160,22 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         logger.debug(f"TrackListen: Trying to inject metadata for track <{track_id}>")
         io_bita = BytesIO(bita)
         io_bita.seek(0)
-        ogg_metadata = OggVorbis(io_bita)
+        try:
+            ogg_metadata = OggVorbis(io_bita)
+        except Exception as e:
+            logger.warning(f"TrackListen: Unable to inject metadata for track <{track_id}>", exc_info=e)
+            return bita
         ogg_metadata["TITLE"] = track_meta.name
         ogg_metadata["ALBUM"] = track_meta.album.name
         artists_list = []
         for artist in track_meta.artist:
             artists_list.append(artist.name)
         ogg_metadata["ARTIST"] = artists_list
-        ogg_metadata.save(io_bita)
+        try:
+            ogg_metadata.save(io_bita)
+        except Exception as e:
+            logger.warning(f"TrackListen: Unable to inject metadata for track <{track_id}>", exc_info=e)
+            return bita
         io_bita.seek(0)
         return io_bita.read()
 
