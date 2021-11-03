@@ -7,8 +7,7 @@ from pathlib import Path
 import coloredlogs
 import sanic
 from dotenv import load_dotenv
-from sanic.response import (HTTPResponse, StreamingHTTPResponse, json, stream,
-                            text)
+from sanic.response import HTTPResponse, StreamingHTTPResponse, json, stream, text
 
 from internals.logger import RollingFileHandler
 from internals.sanic import SpotilavaSanic
@@ -19,12 +18,7 @@ log_path = CURRENT_PATH / "logs"
 log_path.mkdir(exist_ok=True)
 load_dotenv(str(CURRENT_PATH / ".env"))
 
-file_handler = RollingFileHandler(
-    log_path / "spotilava.log",
-    maxBytes=5_242_880,
-    backupCount=5,
-    encoding="utf-8"
-)
+file_handler = RollingFileHandler(log_path / "spotilava.log", maxBytes=5_242_880, backupCount=5, encoding="utf-8")
 logging.basicConfig(
     level=logging.DEBUG,
     handlers=[file_handler],
@@ -87,34 +81,21 @@ async def index(request: sanic.Request) -> HTTPResponse:
 async def get_track_metadata(request: sanic.Request, track_id: str) -> HTTPResponse:
     logger.info(f"TrackMeta: Received request for track <{track_id}>")
     if not app.spotify:
-        logger.warning(
-            f"TrackMeta: Unable to fetch <{track_id}> because Spotify is not ready yet!"
-        )
+        logger.warning(f"TrackMeta: Unable to fetch <{track_id}> because Spotify is not ready yet!")
         return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
     if len(track_id) != 22:
-        logger.warning(
-            f"TrackMeta: Track <{track_id}> is invalid, expected 22 length, got {len(track_id)} instead"
-        )
+        logger.warning(f"TrackMeta: Track <{track_id}> is invalid, expected 22 length, got {len(track_id)} instead")
         return json(
             {
                 "error": f"Invalid track id, expected 22 char length, got {len(track_id)} instead",
                 "code": 400,
-                "data": None
+                "data": None,
             },
-            status=500
+            status=500,
         )
     if not track_id.isalnum():
-        logger.warning(
-            f"TrackMeta: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead"
-        )
-        return json(
-            {
-                "error": "Invalid track id, must be alphanumerical",
-                "code": 400,
-                "data": None
-            },
-            status=500
-        )
+        logger.warning(f"TrackMeta: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead")
+        return json({"error": "Invalid track id, must be alphanumerical", "code": 400, "data": None}, status=500)
 
     metadata = await app.spotify.get_track_metadata(track_id)
     if metadata is None:
@@ -129,19 +110,13 @@ async def get_track_metadata(request: sanic.Request, track_id: str) -> HTTPRespo
 async def get_track_listen(request: sanic.Request, track_id: str):
     logger.info(f"TrackListen: Received request for track <{track_id}>")
     if not app.spotify:
-        logger.warning(
-            f"TrackListen: Unable to fetch <{track_id}> because Spotify is not ready yet!"
-        )
+        logger.warning(f"TrackListen: Unable to fetch <{track_id}> because Spotify is not ready yet!")
         return text("Spotify not connected.", status=500)
     if len(track_id) != 22:
-        logger.warning(
-            f"TrackListen: Track <{track_id}> is invalid, expected 22 length, got {len(track_id)} instead"
-        )
+        logger.warning(f"TrackListen: Track <{track_id}> is invalid, expected 22 length, got {len(track_id)} instead")
         return text("Invalid track id.", status=400)
     if not track_id.isalnum():
-        logger.warning(
-            f"TrackListen: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead"
-        )
+        logger.warning(f"TrackListen: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead")
         return text("Invalid track id.", status=400)
 
     find_track = await app.spotify.get_track(track_id)
@@ -165,10 +140,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
 
     content_length = len(first_data) + find_track.input_stream.available()
 
-    headers = {
-        "Content-Length": str(content_length),
-        "Content-Disposition": f"inline; filename=\"track_{track_id}.ogg\""
-    }
+    headers = {"Content-Length": str(content_length), "Content-Disposition": f'inline; filename="track_{track_id}.ogg"'}
 
     logger.info(f"TrackListen: Sending track <{track_id}>")
     # OGG vorbis stream
@@ -184,34 +156,21 @@ async def get_track_listen(request: sanic.Request, track_id: str):
 async def get_album_contents(request: sanic.Request, album_id: str) -> HTTPResponse:
     logger.info(f"AlbumContents: Received request for album <{album_id}>")
     if not app.spotify:
-        logger.warning(
-            f"AlbumContents: Unable to fetch <{album_id}> because Spotify is not ready yet!"
-        )
+        logger.warning(f"AlbumContents: Unable to fetch <{album_id}> because Spotify is not ready yet!")
         return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
     if len(album_id) != 22:
-        logger.warning(
-            f"AlbumContents: Album <{album_id}> is invalid, expected 22 length, got {len(album_id)} instead"
-        )
+        logger.warning(f"AlbumContents: Album <{album_id}> is invalid, expected 22 length, got {len(album_id)} instead")
         return json(
             {
                 "error": f"Invalid album id, expected 22 char length, got {len(album_id)} instead",
                 "code": 400,
-                "data": None
+                "data": None,
             },
-            status=500
+            status=500,
         )
     if not album_id.isalnum():
-        logger.warning(
-            f"AlbumContents: Album <{album_id}> is invalid, expected alphanumeric, got {album_id} instead"
-        )
-        return json(
-            {
-                "error": "Invalid album id, must be alphanumerical",
-                "code": 400,
-                "data": None
-            },
-            status=500
-        )
+        logger.warning(f"AlbumContents: Album <{album_id}> is invalid, expected alphanumeric, got {album_id} instead")
+        return json({"error": "Invalid album id, must be alphanumerical", "code": 400, "data": None}, status=500)
 
     album_info = await app.spotify.get_album(album_id)
     if album_info is None:
@@ -226,9 +185,7 @@ async def get_album_contents(request: sanic.Request, album_id: str) -> HTTPRespo
 async def get_playlist_contents(request: sanic.Request, playlist_id: str) -> HTTPResponse:
     logger.info(f"PlaylistContents: Received request for playlist <{playlist_id}>")
     if not app.spotify:
-        logger.warning(
-            f"PlaylistContents: Unable to fetch <{playlist_id}> because Spotify is not ready yet!"
-        )
+        logger.warning(f"PlaylistContents: Unable to fetch <{playlist_id}> because Spotify is not ready yet!")
         return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
     if len(playlist_id) != 22:
         logger.warning(
@@ -238,22 +195,15 @@ async def get_playlist_contents(request: sanic.Request, playlist_id: str) -> HTT
             {
                 "error": f"Invalid playlist id, expected 22 char length, got {len(playlist_id)} instead",
                 "code": 400,
-                "data": None
+                "data": None,
             },
-            status=500
+            status=500,
         )
     if not playlist_id.isalnum():
         logger.warning(
             f"PlaylistContents: Playlist <{playlist_id}> is invalid, expected alphanumeric, got {playlist_id} instead"
         )
-        return json(
-            {
-                "error": "Invalid playlist id, must be alphanumerical",
-                "code": 400,
-                "data": None
-            },
-            status=500
-        )
+        return json({"error": "Invalid playlist id, must be alphanumerical", "code": 400, "data": None}, status=500)
 
     playlist_info = await app.spotify.get_playlist(playlist_id)
     if playlist_info is None:
@@ -268,34 +218,21 @@ async def get_playlist_contents(request: sanic.Request, playlist_id: str) -> HTT
 async def get_show_information(request: sanic.Request, show_id: str) -> HTTPResponse:
     logger.info(f"ShowInfo: Received request for show <{show_id}>")
     if not app.spotify:
-        logger.warning(
-            f"ShowInfo: Unable to fetch <{show_id}> because Spotify is not ready yet!"
-        )
+        logger.warning(f"ShowInfo: Unable to fetch <{show_id}> because Spotify is not ready yet!")
         return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
     if len(show_id) != 22:
-        logger.warning(
-            f"ShowInfo: Show <{show_id}> is invalid, expected 22 length, got {len(show_id)} instead"
-        )
+        logger.warning(f"ShowInfo: Show <{show_id}> is invalid, expected 22 length, got {len(show_id)} instead")
         return json(
             {
                 "error": f"Invalid show id, expected 22 char length, got {len(show_id)} instead",
                 "code": 400,
-                "data": None
+                "data": None,
             },
-            status=500
+            status=500,
         )
     if not show_id.isalnum():
-        logger.warning(
-            f"ShowInfo: Show <{show_id}> is invalid, expected alphanumeric, got {show_id} instead"
-        )
-        return json(
-            {
-                "error": "Invalid show id, must be alphanumerical",
-                "code": 400,
-                "data": None
-            },
-            status=500
-        )
+        logger.warning(f"ShowInfo: Show <{show_id}> is invalid, expected alphanumeric, got {show_id} instead")
+        return json({"error": "Invalid show id, must be alphanumerical", "code": 400, "data": None}, status=500)
 
     show_info = await app.spotify.get_show(show_id)
     if show_info is None:
@@ -310,9 +247,7 @@ async def get_show_information(request: sanic.Request, show_id: str) -> HTTPResp
 async def get_episode_information(request: sanic.Request, episode_id: str) -> HTTPResponse:
     logger.info(f"EpisodeMeta: Received request for episode <{episode_id}>")
     if not app.spotify:
-        logger.warning(
-            f"EpisodeMeta: Unable to fetch <{episode_id}> because Spotify is not ready yet!"
-        )
+        logger.warning(f"EpisodeMeta: Unable to fetch <{episode_id}> because Spotify is not ready yet!")
         return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
     if len(episode_id) != 22:
         logger.warning(
@@ -322,22 +257,15 @@ async def get_episode_information(request: sanic.Request, episode_id: str) -> HT
             {
                 "error": f"Invalid episode id, expected 22 char length, got {len(episode_id)} instead",
                 "code": 400,
-                "data": None
+                "data": None,
             },
-            status=500
+            status=500,
         )
     if not episode_id.isalnum():
         logger.warning(
             f"EpisodeMeta: Episode <{episode_id}> is invalid, expected alphanumeric, got {episode_id} instead"
         )
-        return json(
-            {
-                "error": "Invalid episode id, must be alphanumerical",
-                "code": 400,
-                "data": None
-            },
-            status=500
-        )
+        return json({"error": "Invalid episode id, must be alphanumerical", "code": 400, "data": None}, status=500)
 
     metadata = await app.spotify.get_episode_metadata(episode_id)
     if metadata is None:
@@ -352,9 +280,7 @@ async def get_episode_information(request: sanic.Request, episode_id: str) -> HT
 async def get_episode_information(request: sanic.Request, episode_id: str) -> HTTPResponse:
     logger.info(f"EpisodeListen: Received request for episode <{episode_id}>")
     if not app.spotify:
-        logger.warning(
-            f"EpisodeListen: Unable to fetch <{episode_id}> because Spotify is not ready yet!"
-        )
+        logger.warning(f"EpisodeListen: Unable to fetch <{episode_id}> because Spotify is not ready yet!")
         return text("Spotify not connected.", status=500)
     if len(episode_id) != 22:
         logger.warning(
@@ -398,7 +324,7 @@ async def get_episode_information(request: sanic.Request, episode_id: str) -> HT
     content_length = len(first_data) + episode_info.input_stream.available()
     headers = {
         "Content-Length": str(content_length),
-        "Content-Disposition": f"inline; filename=\"episode_{episode_id}{extension}\""
+        "Content-Disposition": f'inline; filename="episode_{episode_id}{extension}"',
     }
 
     logger.info(f"EpisodeListen: Sending episode <{episode_id}>")

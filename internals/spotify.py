@@ -34,8 +34,7 @@ from pathlib import Path
 from typing import List, Optional, Type
 
 import aiohttp
-from librespot.audio import (CdnManager, NormalizationData,
-                             PlayableContentFeeder)
+from librespot.audio import CdnManager, NormalizationData, PlayableContentFeeder
 from librespot.audio.decoders import AudioQuality, VorbisOnlyAudioQuality
 from librespot.core import ApResolver
 from librespot.core import Session as SpotifySession
@@ -274,13 +273,7 @@ class SpotifyShow:
 
 
 class LIBRESpotifyWrapper:
-    def __init__(
-        self,
-        username: str,
-        password: str,
-        *,
-        loop: asyncio.AbstractEventLoop = None
-    ):
+    def __init__(self, username: str, password: str, *, loop: asyncio.AbstractEventLoop = None):
         self.username = username
         self.password = password
         self.logger = logging.getLogger("SpotifyWrapper")
@@ -318,7 +311,7 @@ class LIBRESpotifyWrapper:
                 self.builder.device_name,
                 self.builder.preferred_locale,
                 self.builder.conf,
-                self.builder.device_id
+                self.builder.device_id,
             ),
             ap_endpoint,
         )
@@ -338,28 +331,15 @@ class LIBRESpotifyWrapper:
             track_real,
             VorbisOnlyAudioQuality(AudioQuality.VERY_HIGH),
             False,
-            None
+            None,
         )
         if track is None:
             return None
-        self.logger.info(
-            f"Spotify: Fetching track <{track_id}> complete, now fetching stream..."
-        )
-        init_stream = await self._loop.run_in_executor(
-            None,
-            track.input_stream.stream
-        )
-        self.logger.info(
-            f"Spotify: Track <{track_id}> loaded, returning data"
-        )
+        self.logger.info(f"Spotify: Fetching track <{track_id}> complete, now fetching stream...")
+        init_stream = await self._loop.run_in_executor(None, track.input_stream.stream)
+        self.logger.info(f"Spotify: Track <{track_id}> loaded, returning data")
         return LIBRESpotifyTrack(
-            track_id,
-            track.episode, 
-            track.track,
-            init_stream,
-            track.normalization_data,
-            track.metrics,
-            loop=self._loop
+            track_id, track.episode, track.track, init_stream, track.normalization_data, track.metrics, loop=self._loop
         )
 
     async def get_episode(self, episode_id: str):
@@ -371,20 +351,13 @@ class LIBRESpotifyWrapper:
             episode_real,
             VorbisOnlyAudioQuality(AudioQuality.VERY_HIGH),
             False,
-            None
+            None,
         )
         if episode is None:
             return None
-        self.logger.info(
-            f"Spotify: Fetching episode <{episode_id}> complete, now fetching stream..."
-        )
-        init_stream = await self._loop.run_in_executor(
-            None,
-            episode.input_stream.stream
-        )
-        self.logger.info(
-            f"Spotify: Episode <{episode_id}> loaded, returning data"
-        )
+        self.logger.info(f"Spotify: Fetching episode <{episode_id}> complete, now fetching stream...")
+        init_stream = await self._loop.run_in_executor(None, episode.input_stream.stream)
+        self.logger.info(f"Spotify: Episode <{episode_id}> loaded, returning data")
         return LIBRESpotifyTrack(
             episode_id,
             episode.episode,
@@ -393,28 +366,18 @@ class LIBRESpotifyWrapper:
             episode.normalization_data,
             episode.metrics,
             loop=self._loop,
-            is_track=False
+            is_track=False,
         )
 
     async def _get_token(self):
         self.logger.info("Spotify: Fetching token provider")
-        token_provider = await self._loop.run_in_executor(
-            None,
-            self.session.tokens
-        )
+        token_provider = await self._loop.run_in_executor(None, self.session.tokens)
         self.logger.info("Spotify: Fetching token for playlist-read")
-        token = await self._loop.run_in_executor(
-            None,
-            token_provider.get_token,
-            "playlist-read"
-        )
+        token = await self._loop.run_in_executor(None, token_provider.get_token, "playlist-read")
         return token.access_token
 
     async def _fetch_all_tracks(self, next: str, token: str):
-        header_token = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+        header_token = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
         merged_items = []
         next_url = next
@@ -434,10 +397,7 @@ class LIBRESpotifyWrapper:
     async def get_track_metadata(self, track_id: str) -> Optional[SpotifyTrack]:
         token = await self._get_token()
 
-        header_token = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+        header_token = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
         async with aiohttp.ClientSession(headers=header_token) as client:
             self.logger.info(f"Spotify: Requesting <{track_id}> into Tracks API")
@@ -453,10 +413,7 @@ class LIBRESpotifyWrapper:
     async def get_album(self, album_id: str) -> Optional[SpotifyAlbum]:
         token = await self._get_token()
 
-        header_token = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+        header_token = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
         async with aiohttp.ClientSession(headers=header_token) as client:
             self.logger.info(f"Spotify: Requesting <{album_id}> into Album API")
@@ -488,10 +445,7 @@ class LIBRESpotifyWrapper:
     async def get_playlist(self, playlist_id: str) -> Optional[SpotifyPlaylist]:
         token = await self._get_token()
 
-        header_token = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+        header_token = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
         async with aiohttp.ClientSession(headers=header_token) as client:
             self.logger.info(f"Spotify: Requesting <{playlist_id}> into Playlist API")
@@ -523,10 +477,7 @@ class LIBRESpotifyWrapper:
     async def get_show(self, show_id: str):
         token = await self._get_token()
 
-        header_token = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+        header_token = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
         async with aiohttp.ClientSession(headers=header_token) as client:
             self.logger.info(f"Spotify: Requesting <{show_id}> into Shows API")
@@ -556,10 +507,7 @@ class LIBRESpotifyWrapper:
     async def get_episode_metadata(self, episode_id: str):
         token = await self._get_token()
 
-        header_token = {
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
+        header_token = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
         async with aiohttp.ClientSession(headers=header_token) as client:
             self.logger.info(f"Spotify: Requesting <{episode_id}> into Episodes API")
