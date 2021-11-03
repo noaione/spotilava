@@ -132,3 +132,4 @@ dmypy.json
 config/spotify.json
 *.ogg
 logs/
+_data_test/*

@@ -28,6 +28,7 @@ import asyncio
 import logging
 import os
 from dataclasses import dataclass, field
+from io import BytesIO
 from math import ceil
 from pathlib import Path
 from typing import List, Optional, Type
@@ -38,16 +39,19 @@ from librespot.audio import (CdnManager, NormalizationData,
 from librespot.audio.decoders import AudioQuality, VorbisOnlyAudioQuality
 from librespot.core import ApResolver
 from librespot.core import Session as SpotifySession
-from librespot.metadata import TrackId
+from librespot.metadata import EpisodeId, TrackId
 from librespot.proto import Metadata_pb2 as Metadata
+from mutagen.oggvorbis import OggVorbis
 
 from .utils import complex_walk
 
 BASE_DIR = Path(__name__).parent.parent
+_log = logging.getLogger("Internals.Spotify")
 
 
 @dataclass
 class LIBRESpotifyTrack:
+    id: str
     episode: Optional[Metadata.Episode]
     track: Optional[Metadata.Track]
     input_stream: CdnManager.Streamer.InternalStream
@@ -197,6 +201,78 @@ class SpotifyPlaylist:
         }
 
 
+@dataclass
+class SpotifyEpisode:
+    id: str
+    title: str
+    description: str
+    show: str
+    image: Optional[str]
+    publisher: str
+    duration: Optional[int] = None
+
+    @classmethod
+    def from_episode(cls: Type[SpotifyEpisode], episode: dict, parent_show: Optional[dict] = {}) -> SpotifyEpisode:
+        show_name = complex_walk(episode, "show.name") or complex_walk(parent_show, "name")
+        show_art = complex_walk(episode, "images.0.url")
+
+        publisher = complex_walk(episode, "show.publisher") or complex_walk(parent_show, "publisher")
+        duration = int(ceil(episode.get("duration_ms", 0) / 1000))
+        description = complex_walk(episode, "description")
+        return cls(
+            id=episode["id"],
+            title=episode["name"],
+            description=description,
+            show=show_name,
+            image=show_art,
+            publisher=publisher,
+            duration=duration,
+        )
+
+    def to_json(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "description": self.description,
+            "show": self.show,
+            "image": self.image,
+            "publisher": self.publisher,
+            "duration": self.duration,
+        }
+
+
+@dataclass
+class SpotifyShow:
+    id: str
+    name: str
+    image: str
+    episodes: List[SpotifyEpisode]
+
+    @classmethod
+    def from_show(cls: Type[SpotifyShow], show: dict) -> SpotifyShow:
+        image = complex_walk(show, "images.0.url")
+        episodes_set = complex_walk(show, "episodes.items") or []
+        yoinked_data = {
+            "name": show["name"],
+            "publisher": complex_walk(show, "publisher"),
+        }
+        episodes = [SpotifyEpisode.from_episode(episode, yoinked_data) for episode in episodes_set]
+        return cls(
+            id=show["id"],
+            name=show["name"],
+            image=image,
+            episodes=episodes,
+        )
+
+    def to_json(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "image": self.image,
+            "episodes": [episode.to_json() for episode in self.episodes],
+        }
+
+
 class LIBRESpotifyWrapper:
     def __init__(
         self,
@@ -277,12 +353,47 @@ class LIBRESpotifyWrapper:
             f"Spotify: Track <{track_id}> loaded, returning data"
         )
         return LIBRESpotifyTrack(
+            track_id,
             track.episode, 
             track.track,
             init_stream,
             track.normalization_data,
             track.metrics,
             loop=self._loop
+        )
+
+    async def get_episode(self, episode_id: str):
+        episode_real = EpisodeId.from_uri(f"spotify:episode:{episode_id}")
+        self.logger.info(f"Spotify: Fetching episode <{episode_id}>")
+        episode = await self._loop.run_in_executor(
+            None,
+            self.session.content_feeder().load,
+            episode_real,
+            VorbisOnlyAudioQuality(AudioQuality.VERY_HIGH),
+            False,
+            None
+        )
+        if episode is None:
+            return None
+        self.logger.info(
+            f"Spotify: Fetching episode <{episode_id}> complete, now fetching stream..."
+        )
+        init_stream = await self._loop.run_in_executor(
+            None,
+            episode.input_stream.stream
+        )
+        self.logger.info(
+            f"Spotify: Episode <{episode_id}> loaded, returning data"
+        )
+        return LIBRESpotifyTrack(
+            episode_id,
+            episode.episode,
+            episode.track,
+            init_stream,
+            episode.normalization_data,
+            episode.metrics,
+            loop=self._loop,
+            is_track=False
         )
 
     async def _get_token(self):
@@ -408,3 +519,87 @@ class LIBRESpotifyWrapper:
                 playlist_data.tracks = current_tracks
             return playlist_data
         return None
+
+    async def get_show(self, show_id: str):
+        token = await self._get_token()
+
+        header_token = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        async with aiohttp.ClientSession(headers=header_token) as client:
+            self.logger.info(f"Spotify: Requesting <{show_id}> into Shows API")
+            async with client.get(f"https://api.spotify.com/v1/shows/{show_id}") as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+
+        next_token = complex_walk(data, "episodes.next")
+        merged_items = None
+        if next_token:
+            self.logger.info(f"Spotify: Shows <{show_id}> has next data, fetching...")
+            merged_items = await self._fetch_all_tracks(next_token, token)
+
+        if data:
+            show_data = SpotifyShow.from_show(data)
+            if merged_items:
+                parsed_data = []
+                for item in merged_items:
+                    parsed_data.append(SpotifyEpisode.from_episode(item))
+                current_episodes = show_data.episodes
+                current_episodes.extend(parsed_data)
+                show_data.episodes = current_episodes
+            return show_data
+        return None
+
+    async def get_episode_metadata(self, episode_id: str):
+        token = await self._get_token()
+
+        header_token = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        }
+
+        async with aiohttp.ClientSession(headers=header_token) as client:
+            self.logger.info(f"Spotify: Requesting <{episode_id}> into Episodes API")
+            async with client.get(f"https://api.spotify.com/v1/episodes/{episode_id}") as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+
+        if data:
+            return SpotifyEpisode.from_episode(data)
+        return None
+
+
+def inject_ogg_metadata(bita: bytes, track: LIBRESpotifyTrack) -> bytes:
+    _log.debug(f"OggInject: Trying to inject metadata for track/episode <{track.id}>")
+    io_bita = BytesIO(bita)
+    io_bita.seek(0)
+    try:
+        ogg_metadata = OggVorbis(io_bita)
+    except Exception as e:
+        _log.warning(f"OggInject: Unable to inject metadata for track/episode <{track.id}>", exc_info=e)
+        return bita
+    track_meta = track.track
+    if not track.is_track:
+        track_meta = track.episode
+    ogg_metadata["TITLE"] = track_meta.name
+    if not track.is_track:
+        ogg_metadata["ALBUM"] = track_meta.show.name
+    artists_list = []
+    if track.is_track:
+        for artist in track_meta.artist:
+            artists_list.append(artist.name)
+    else:
+        # Use show name temporarily
+        artists_list = [track_meta.show.name]
+    ogg_metadata["ARTIST"] = artists_list
+    try:
+        ogg_metadata.save(io_bita)
+    except Exception as e:
+        _log.warning(f"OggInject: Unable to inject metadata for track/episode <{track.id}>", exc_info=e)
+        return bita
+    io_bita.seek(0)
+    return io_bita.read()

@@ -2,19 +2,17 @@ import asyncio
 import logging
 import os
 import sys
-from io import BytesIO
 from pathlib import Path
 
 import coloredlogs
 import sanic
 from dotenv import load_dotenv
-from mutagen.oggvorbis import OggVorbis
 from sanic.response import (HTTPResponse, StreamingHTTPResponse, json, stream,
                             text)
 
 from internals.logger import RollingFileHandler
 from internals.sanic import SpotilavaSanic
-from internals.spotify import LIBRESpotifyWrapper
+from internals.spotify import LIBRESpotifyWrapper, inject_ogg_metadata
 
 CURRENT_PATH = Path(__file__).parent
 log_path = CURRENT_PATH / "logs"
@@ -142,7 +140,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         return text("Invalid track id.", status=400)
     if not track_id.isalnum():
         logger.warning(
-            f"TrackMeta: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead"
+            f"TrackListen: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead"
         )
         return text("Invalid track id.", status=400)
 
@@ -154,34 +152,9 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         logger.warning(f"TrackListen: Unable to find track <{track_id}>, track meta is missing")
         return text("Track not found.", status=404)
 
-    track_meta = find_track.track
-
-    def inject_ogg_metadata(bita: bytes) -> bytes:
-        logger.debug(f"TrackListen: Trying to inject metadata for track <{track_id}>")
-        io_bita = BytesIO(bita)
-        io_bita.seek(0)
-        try:
-            ogg_metadata = OggVorbis(io_bita)
-        except Exception as e:
-            logger.warning(f"TrackListen: Unable to inject metadata for track <{track_id}>", exc_info=e)
-            return bita
-        ogg_metadata["TITLE"] = track_meta.name
-        ogg_metadata["ALBUM"] = track_meta.album.name
-        artists_list = []
-        for artist in track_meta.artist:
-            artists_list.append(artist.name)
-        ogg_metadata["ARTIST"] = artists_list
-        try:
-            ogg_metadata.save(io_bita)
-        except Exception as e:
-            logger.warning(f"TrackListen: Unable to inject metadata for track <{track_id}>", exc_info=e)
-            return bita
-        io_bita.seek(0)
-        return io_bita.read()
-
     logger.debug(f"TrackListen: Reading first {CHUNK_SIZE} bytes of <{track_id}>")
     first_data = await find_track.read_bytes(CHUNK_SIZE)
-    first_data = inject_ogg_metadata(first_data)
+    first_data = inject_ogg_metadata(first_data, find_track)
 
     # Streaming function
     async def track_stream(response: StreamingHTTPResponse):
@@ -194,11 +167,10 @@ async def get_track_listen(request: sanic.Request, track_id: str):
 
     headers = {
         "Content-Length": str(content_length),
-        "Content-Disposition": f"inline; filename=\"{track_id}.ogg\""
+        "Content-Disposition": f"inline; filename=\"track_{track_id}.ogg\""
     }
 
     logger.info(f"TrackListen: Sending track <{track_id}>")
-
     # OGG vorbis stream
     return stream(
         track_stream,
@@ -290,6 +262,153 @@ async def get_playlist_contents(request: sanic.Request, playlist_id: str) -> HTT
 
     playlist_meta = playlist_info.to_json()
     return json({"error": "Success", "code": 200, "data": playlist_meta})
+
+
+@app.get("/show/<show_id>")
+async def get_show_information(request: sanic.Request, show_id: str) -> HTTPResponse:
+    logger.info(f"ShowInfo: Received request for show <{show_id}>")
+    if not app.spotify:
+        logger.warning(
+            f"ShowInfo: Unable to fetch <{show_id}> because Spotify is not ready yet!"
+        )
+        return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
+    if len(show_id) != 22:
+        logger.warning(
+            f"ShowInfo: Show <{show_id}> is invalid, expected 22 length, got {len(show_id)} instead"
+        )
+        return json(
+            {
+                "error": f"Invalid show id, expected 22 char length, got {len(show_id)} instead",
+                "code": 400,
+                "data": None
+            },
+            status=500
+        )
+    if not show_id.isalnum():
+        logger.warning(
+            f"ShowInfo: Show <{show_id}> is invalid, expected alphanumeric, got {show_id} instead"
+        )
+        return json(
+            {
+                "error": "Invalid show id, must be alphanumerical",
+                "code": 400,
+                "data": None
+            },
+            status=500
+        )
+
+    show_info = await app.spotify.get_show(show_id)
+    if show_info is None:
+        logger.warning(f"ShowInfo: Unable to find show <{show_id}>")
+        return json({"error": "Show not found.", "code": 404, "data": None}, status=404)
+
+    show_data = show_info.to_json()
+    return json({"error": "Success", "code": 200, "data": show_data})
+
+
+@app.get("/episode/<episode_id>")
+async def get_episode_information(request: sanic.Request, episode_id: str) -> HTTPResponse:
+    logger.info(f"EpisodeMeta: Received request for episode <{episode_id}>")
+    if not app.spotify:
+        logger.warning(
+            f"EpisodeMeta: Unable to fetch <{episode_id}> because Spotify is not ready yet!"
+        )
+        return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
+    if len(episode_id) != 22:
+        logger.warning(
+            f"EpisodeMeta: Episode <{episode_id}> is invalid, expected 22 length, got {len(episode_id)} instead"
+        )
+        return json(
+            {
+                "error": f"Invalid episode id, expected 22 char length, got {len(episode_id)} instead",
+                "code": 400,
+                "data": None
+            },
+            status=500
+        )
+    if not episode_id.isalnum():
+        logger.warning(
+            f"EpisodeMeta: Episode <{episode_id}> is invalid, expected alphanumeric, got {episode_id} instead"
+        )
+        return json(
+            {
+                "error": "Invalid episode id, must be alphanumerical",
+                "code": 400,
+                "data": None
+            },
+            status=500
+        )
+
+    metadata = await app.spotify.get_episode_metadata(episode_id)
+    if metadata is None:
+        logger.warning(f"EpisodeMeta: Unable to find episode <{episode_id}>")
+        return json({"error": "Episode not found.", "code": 404, "data": None}, status=404)
+
+    logger.info(f"EpisodeMeta: Sending episode <{episode_id}> metadata")
+    return json({"error": "Success", "code": 200, "data": metadata.to_json()}, status=200, ensure_ascii=False)
+
+
+@app.get("/episode/<episode_id>/listen")
+async def get_episode_information(request: sanic.Request, episode_id: str) -> HTTPResponse:
+    logger.info(f"EpisodeListen: Received request for episode <{episode_id}>")
+    if not app.spotify:
+        logger.warning(
+            f"EpisodeListen: Unable to fetch <{episode_id}> because Spotify is not ready yet!"
+        )
+        return text("Spotify not connected.", status=500)
+    if len(episode_id) != 22:
+        logger.warning(
+            f"EpisodeListen: Episode <{episode_id}> is invalid, expected 22 length, got {len(episode_id)} instead"
+        )
+        return text("Invalid episode id.", status=400)
+    if not episode_id.isalnum():
+        logger.warning(
+            f"EpisodeListen: Episode <{episode_id}> is invalid, expected alphanumeric, got {episode_id} instead"
+        )
+        return text("Invalid episode id.", status=400)
+
+    episode_info = await app.spotify.get_episode(episode_id)
+    if episode_info is None:
+        logger.warning(f"EpisodeListen: Unable to find episode <{episode_id}>")
+        return text("Episode not found.", status=404)
+    if episode_info.episode is None:
+        logger.warning(f"EpisodeListen: Unable to find episode <{episode_id}>, track meta is missing")
+        return text("Episode not found.", status=404)
+
+    logger.debug(f"EpisodeListen: Reading first {CHUNK_SIZE} bytes of <{episode_id}>")
+    first_data = await episode_info.read_bytes(CHUNK_SIZE)
+    is_mp3_file = first_data[:3] == b"ID3"
+    extension = ".mp3"
+    content_type = "audio/mpeg"
+    if is_mp3_file:
+        logger.debug(f"EpisodeListen: <{episode_id}> has an ID3 tag, skipping injection")
+    else:
+        logger.debug(f"EpisodeListen: <{episode_id}> is not an MP3, injecting metadata")
+        first_data = inject_ogg_metadata(first_data, episode_info)
+        extension = ".ogg"
+        content_type = "audio/ogg"
+
+    # Streaming function
+    async def episode_stream(response: StreamingHTTPResponse):
+        await response.write(first_data)
+        while episode_info.input_stream.available() > 0:
+            data = await episode_info.read_bytes(CHUNK_SIZE)
+            await response.write(data)
+
+    content_length = len(first_data) + episode_info.input_stream.available()
+    headers = {
+        "Content-Length": str(content_length),
+        "Content-Disposition": f"inline; filename=\"episode_{episode_id}{extension}\""
+    }
+
+    logger.info(f"EpisodeListen: Sending episode <{episode_id}>")
+    # OGG vorbis stream
+    return stream(
+        episode_stream,
+        status=200,
+        content_type=content_type,
+        headers=headers,
+    )
 
 
 if __name__ == "__main__":
