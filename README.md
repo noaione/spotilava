@@ -44,14 +44,18 @@ In `.env.example` you will find 3 options:
 
 ## API Route
 
-- `/:track_id` fetch the metadata of the track ID. (JSON)
-- `/:track_id/listen` fetch the track itself, returns the OGG Vorbis stream. (Binary)
+- `/:track_id` get the metadata of the track ID. (JSON)
+- `/:track_id/listen` get the track itself, returns the OGG Vorbis stream. (Binary)
 - `/album/:album_id/` get the list of Album data. (JSON)
 - `/playlist/:playlist_id` get the list of playlist data. (JSON)
+- `/show/:show_id/` get the list of Show/Podcast data. (JSON)
+- `/episode/:episode_id` get the metadata of a podcast episode. (JSON)
+- `/episode/:episode_id/listen` get the episode itself, returns an OGG Vorbis or MP3 stream. (Binary)
 
 The other API can be used to fetch about playlist/album/track information before requesting lavaplayer the real URL (`/:track_id/listen`).
 
-I'm planning to implement support for Shows/Podcast too.
+~~I'm planning to implement support for Shows/Podcast too.~~
+Implemented since commit: https://github.com/noaione/spotilava/commit/d54fdd9045d5e54460e72ec65a1f43d97b72267f
 
 ## How it works?
 
