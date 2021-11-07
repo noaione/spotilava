@@ -1,5 +1,4 @@
 import asyncio
-from io import BytesIO
 import logging
 import os
 import sys

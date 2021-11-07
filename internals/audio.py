@@ -27,12 +27,12 @@ This implements the rest of AAC and MP3 encoding quality.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import Any, List, Optional
 
 from librespot.audio import SuperAudioFormat
 from librespot.audio.decoders import AudioQuality
-from librespot.structure import AudioQualityPicker
 from librespot.proto import Metadata_pb2 as Metadata
+from librespot.structure import AudioQualityPicker
 
 
 class AutoFallbackAudioQuality(AudioQualityPicker):
