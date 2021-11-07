@@ -9,9 +9,21 @@ This webserver is an actual Spotify player and not using Youtube or something li
 
 I am not responsible if your account got banned, this webserver still possibly breaks Spotify ToS since it falls into account sharing.
 
+I would recommend a burner premium account.
+
+## Features
+- [x] API routes to fetch Album/Playlist/Show information (including Track and Episode)
+- [x] Support listening to Track natively
+- [x] Support listening to Podcast/episode natively
+- [x] Automatically use the best possible audio quality and format
+  - The fallback is as follows: `Vorbis` -> `MP3` (AAC is currently disabled because it's broken)
+  - It will also take account the audio quality. (`VERY_HIGH` > `HIGH` > `NORMAL`)
+- [x] Automatic metadata injection if needed w/ mutagen (so Lavalink/Lavaplayer parse it properly.)
+- [x] Asynchronous from the start (Powered with [Sanic](https://sanicframework.org/))
+
 ## Requirements
 
-- Python 3.8+ (I haven't tested with Python 3.6/3.7)
+- Python 3.7+ (Tested on Python 3.8, Python 3.9)
 - Spotify Premium Account
 - A server to host this.
 
@@ -64,9 +76,10 @@ I'm using an external library called [librespot-python](https://github.com/kokar
 The program will then request the input stream of the file with `librespot-python` help, and then will do this:
 
 1. Request the first x bytes (default to 4096 bytes)
-2. Inject that bytes with OGG metadata so lavalink will parse it correctly.
-3. Return a stream response with [Sanic](https://sanicframework.org/en/guide/advanced/streaming.html#response-streaming) which will send the injected bytes then the remainder of the file.
-4. Lavaplayer will happily accept the data and not broke apart hopefully.
+2. Check what file format it's (MP3 or Vorbis)
+3. Inject the metadata if possible.
+4. Return a stream response with [Sanic](https://sanicframework.org/en/guide/advanced/streaming.html#response-streaming) which will send the injected bytes then the remainder of the file.
+5. Lavaplayer will happily accept the data and not broke apart hopefully.
 
 ## Current Problems
 
