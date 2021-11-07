@@ -1,4 +1,5 @@
 import asyncio
+from io import BytesIO
 import logging
 import os
 import sys
@@ -10,9 +11,12 @@ from dotenv import load_dotenv
 from sanic.response import HTTPResponse, StreamingHTTPResponse, json, stream, text
 
 from internals.logger import RollingFileHandler
+from internals.monke import monkeypatch_load
 from internals.sanic import SpotilavaSanic
-from internals.spotify import LIBRESpotifyWrapper, inject_ogg_metadata
+from internals.spotify import LIBRESpotifyWrapper, should_inject_metadata
 
+# Monkeypatch librespot
+monkeypatch_load()
 CURRENT_PATH = Path(__file__).parent
 log_path = CURRENT_PATH / "logs"
 log_path.mkdir(exist_ok=True)
@@ -129,7 +133,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
 
     logger.debug(f"TrackListen: Reading first {CHUNK_SIZE} bytes of <{track_id}>")
     first_data = await find_track.read_bytes(CHUNK_SIZE)
-    first_data = inject_ogg_metadata(first_data, find_track)
+    first_data, content_type, file_ext = should_inject_metadata(first_data, find_track)
 
     # Streaming function
     async def track_stream(response: StreamingHTTPResponse):
@@ -140,14 +144,17 @@ async def get_track_listen(request: sanic.Request, track_id: str):
 
     content_length = len(first_data) + find_track.input_stream.available()
 
-    headers = {"Content-Length": str(content_length), "Content-Disposition": f'inline; filename="track_{track_id}.ogg"'}
+    headers = {
+        "Content-Length": str(content_length),
+        "Content-Disposition": f'inline; filename="track_{track_id}{file_ext}"',
+    }
 
     logger.info(f"TrackListen: Sending track <{track_id}>")
     # OGG vorbis stream
     return stream(
         track_stream,
         status=200,
-        content_type="audio/ogg",
+        content_type=content_type,
         headers=headers,
     )
 
@@ -303,16 +310,7 @@ async def get_episode_information(request: sanic.Request, episode_id: str) -> HT
 
     logger.debug(f"EpisodeListen: Reading first {CHUNK_SIZE} bytes of <{episode_id}>")
     first_data = await episode_info.read_bytes(CHUNK_SIZE)
-    is_mp3_file = first_data[:3] == b"ID3"
-    extension = ".mp3"
-    content_type = "audio/mpeg"
-    if is_mp3_file:
-        logger.debug(f"EpisodeListen: <{episode_id}> has an ID3 tag, skipping injection")
-    else:
-        logger.debug(f"EpisodeListen: <{episode_id}> is not an MP3, injecting metadata")
-        first_data = inject_ogg_metadata(first_data, episode_info)
-        extension = ".ogg"
-        content_type = "audio/ogg"
+    first_data, content_type, file_ext = should_inject_metadata(first_data, episode_info)
 
     # Streaming function
     async def episode_stream(response: StreamingHTTPResponse):
@@ -324,7 +322,7 @@ async def get_episode_information(request: sanic.Request, episode_id: str) -> HT
     content_length = len(first_data) + episode_info.input_stream.available()
     headers = {
         "Content-Length": str(content_length),
-        "Content-Disposition": f'inline; filename="episode_{episode_id}{extension}"',
+        "Content-Disposition": f'inline; filename="episode_{episode_id}{file_ext}"',
     }
 
     logger.info(f"EpisodeListen: Sending episode <{episode_id}>")

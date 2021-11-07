@@ -31,15 +31,16 @@ from dataclasses import dataclass, field
 from io import BytesIO
 from math import ceil
 from pathlib import Path
-from typing import List, Optional, Type
+from typing import List, Literal, Optional, Tuple, Type
 
 import aiohttp
 from librespot.audio import CdnManager, NormalizationData, PlayableContentFeeder
-from librespot.audio.decoders import AudioQuality, VorbisOnlyAudioQuality
+from librespot.audio.decoders import AudioQuality
 from librespot.core import ApResolver
 from librespot.core import Session as SpotifySession
 from librespot.metadata import EpisodeId, TrackId
 from librespot.proto import Metadata_pb2 as Metadata
+from mutagen.mp3 import MP3
 from mutagen.oggvorbis import OggVorbis
 
 from .utils import complex_walk
@@ -329,7 +330,7 @@ class LIBRESpotifyWrapper:
             None,
             self.session.content_feeder().load,
             track_real,
-            VorbisOnlyAudioQuality(AudioQuality.VERY_HIGH),
+            AudioQuality.VERY_HIGH,
             False,
             None,
         )
@@ -349,7 +350,7 @@ class LIBRESpotifyWrapper:
             None,
             self.session.content_feeder().load,
             episode_real,
-            VorbisOnlyAudioQuality(AudioQuality.VERY_HIGH),
+            AudioQuality.VERY_HIGH,
             False,
             None,
         )
@@ -528,7 +529,7 @@ def inject_ogg_metadata(bita: bytes, track: LIBRESpotifyTrack) -> bytes:
     try:
         ogg_metadata = OggVorbis(io_bita)
     except Exception as e:
-        _log.warning(f"OggInject: Unable to inject metadata for track/episode <{track.id}>", exc_info=e)
+        _log.warning(f"OggInject: Unable to open track/episode <{track.id}>", exc_info=e)
         return bita
     track_meta = track.track
     if not track.is_track:
@@ -551,3 +552,70 @@ def inject_ogg_metadata(bita: bytes, track: LIBRESpotifyTrack) -> bytes:
         return bita
     io_bita.seek(0)
     return io_bita.read()
+
+
+def test_mp3_meta(bita: bytes):
+    io_bita = BytesIO(bita)
+    io_bita.seek(0)
+    try:
+        MP3(io_bita)
+        return True
+    except Exception:
+        _log.warning(f"Unable to find MP3 header")
+        return False
+
+
+def inject_mp3_metadata(bita: bytes, track: LIBRESpotifyTrack) -> bytes:
+    io_bita = BytesIO(bita)
+    io_bita.seek(0)
+    try:
+        mp3_metadata = MP3(io_bita)
+    except Exception as e:
+        _log.warning(f"MP3Inject: Unable to open track/episode <{track.id}>", exc_info=e)
+        return bita
+
+    track_meta = track.track
+    if not track.is_track:
+        track_meta = track.episode
+    mp3_metadata["TITLE"] = track_meta.name
+    if not track.is_track:
+        mp3_metadata["ALBUM"] = track_meta.show.name
+    artists_list = []
+    if track.is_track:
+        for artist in track_meta.artist:
+            artists_list.append(artist.name)
+    else:
+        # Use show name temporarily
+        artists_list = [track_meta.show.name]
+    mp3_metadata["ARTIST"] = artists_list
+    try:
+        mp3_metadata.save(io_bita)
+    except Exception as e:
+        _log.warning(f"MP3Inject: Unable to inject metadata for track/episode <{track.id}>", exc_info=e)
+        return bita
+    io_bita.seek(0)
+    return io_bita.read()
+
+
+FileContentType = Literal["audio/ogg", "audio/mpeg", "audio/aac"]
+FileContentExt = Literal[".ogg", ".mp3", ".m4a"]
+
+
+def should_inject_metadata(bita: bytes, track: LIBRESpotifyTrack) -> Tuple[bytes, FileContentType, FileContentExt]:
+    _log.info(f"MetaInjectTest: Checking bytes header for OggS...")
+    ogg_bita = bita[:4]
+    if ogg_bita == b"OggS":
+        _log.info(f"MetaInjectTest: Found OggS header, injecting metadata...")
+        return inject_ogg_metadata(bita, track), "audio/ogg", ".ogg"
+    _log.info(f"MetaInjectTest: No OggS header found, trying to check ID3 meta...")
+    id3_bita = bita[:3]
+    if id3_bita == b"ID3":
+        _log.info(f"MetaInjectTest: Found ID3 header, returning immediatly...")
+        return bita, "audio/mpeg", ".mp3"
+    _log.info(f"MetaInjectTest: No ID3 header found, trying to find MP3 header...")
+    is_mp3 = test_mp3_meta(bita)
+    if is_mp3:
+        _log.info(f"MetaInjectTest: Found MP3 header, injecting metadata...")
+        return inject_mp3_metadata(bita, track), "audio/mpeg", ".mp3"
+    _log.info(f"MetaInjectTest: No match for metadata, returning immediatly with ogg meta...")
+    return bita, "audio/ogg", ".ogg"
