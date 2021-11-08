@@ -537,6 +537,8 @@ def inject_ogg_metadata(bita: bytes, track: LIBRESpotifyTrack) -> bytes:
     ogg_metadata["TITLE"] = track_meta.name
     if not track.is_track:
         ogg_metadata["ALBUM"] = track_meta.show.name
+    else:
+        ogg_metadata["ALBUM"] = track_meta.album.name
     artists_list = []
     if track.is_track:
         for artist in track_meta.artist:
