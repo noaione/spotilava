@@ -66,6 +66,12 @@ try:
 except Exception:
     CHUNK_SIZE = 4096
 
+PORT = os.getenv("PORT")
+if PORT is None:
+    PORT = 37784
+else:
+    PORT = int(PORT)
+
 app.add_task(connect_spotify)
 
 # For metadata tagging purpose
@@ -336,7 +342,7 @@ async def get_episode_information(request: sanic.Request, episode_id: str) -> HT
 
 if __name__ == "__main__":
     try:
-        app.run("0.0.0.0", 37784)
+        app.run("0.0.0.0", PORT)
     except KeyboardInterrupt:
         logger.info("Shutting down...")
         app.spotify.clsoe()
