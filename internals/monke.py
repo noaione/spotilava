@@ -33,6 +33,7 @@ from librespot.audio import CdnFeedHelper
 from librespot.metadata import EpisodeId, PlayableId, TrackId
 
 from .audio import AutoFallbackAudioQuality
+from .errors import NoAudioFound, NoTrackFound
 
 if TYPE_CHECKING:
     from librespot.audio import PlayableContentFeeder, Session
@@ -53,14 +54,15 @@ def load_track_with_fallback(
         original = session.api().get_metadata_4_track(track_id_or_track)
         track = self.pick_alternative_if_necessary(original)
         if track is None:
-            raise RuntimeError("Cannot get alternative track")
+            self.logger.error(f"Unable to find track to be played on with this account")
+            raise NoTrackFound
     else:
         track = track_id_or_track
 
     selected_audio = AutoFallbackAudioQuality(audio_quality).get_file(track.file)
     if selected_audio is None:
         self.logger.fatal("Couldn't find any suitable audio file: available: {}".format(track.file))
-        raise
+        raise NoAudioFound
     return self.load_stream(selected_audio, track, None, preload, halt_listener)
 
 
@@ -79,7 +81,7 @@ def load_episode_with_fallback(
     selected_audio = AutoFallbackAudioQuality(audio_quality).get_file(episode.audio)
     if selected_audio is None:
         self.logger.fatal("Couldn't find any suitable audio file: available: {}".format(episode.audio))
-        raise
+        raise NoAudioFound
     return self.load_stream(selected_audio, None, episode, preload, halt_listener)
 
 

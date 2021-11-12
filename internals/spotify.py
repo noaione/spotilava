@@ -31,6 +31,7 @@ from dataclasses import dataclass, field
 from io import BytesIO
 from math import ceil
 from pathlib import Path
+from time import time as ctime
 from typing import List, Literal, Optional, Tuple, Type
 
 import aiohttp
@@ -43,6 +44,7 @@ from librespot.proto import Metadata_pb2 as Metadata
 from mutagen.mp3 import MP3
 from mutagen.oggvorbis import OggVorbis
 
+from .errors import NoAudioFound, NoTrackFound
 from .utils import complex_walk
 
 BASE_DIR = Path(__name__).parent.parent
@@ -273,6 +275,48 @@ class SpotifyShow:
         }
 
 
+class SpotifySessionAsync(SpotifySession):
+    """
+    A wrapped class that wrap some stuff with async related functions.
+    """
+
+    def __init__(self, inner: SpotifySession.Inner, address: str, *, loop: asyncio.AbstractEventLoop = None) -> None:
+        super().__init__(inner, address)
+        self._loop = loop or asyncio.get_event_loop()
+
+        self._actual_reconnect_task: Optional[asyncio.Task] = None
+
+    async def _reconnect(self) -> None:
+        """
+        Reconnect to the server.
+        """
+        await self._loop.run_in_executor(None, super().reconnect)
+
+    def _reconnect_done(self):
+        self.logger.info("Connection reestablished again, removing task...")
+        if self._actual_reconnect_task:
+            self._actual_reconnect_task = None
+
+    def close(self) -> None:
+        """
+        Close the session.
+        """
+        super().close()
+        if self._actual_reconnect_task:
+            self._actual_reconnect_task.cancel()
+
+    def reconnect(self) -> None:
+        """
+        Reconnect to the Spotify API.
+        This will actuall do schedule with loop.call_soon_threadsafe.
+        """
+        self.logger.info("Reconnecting to Spotify API with task...")
+        dt = int(ctime())
+        task = self._loop.create_task(self._reconnect(), name=f"librespot-reconnect-{dt}")
+        task.add_done_callback(self._reconnect_done)
+        self._actual_reconnect_task = task
+
+
 class LIBRESpotifyWrapper:
     def __init__(self, username: str, password: str, *, loop: asyncio.AbstractEventLoop = None):
         self.username = username
@@ -296,7 +340,7 @@ class LIBRESpotifyWrapper:
         builder.set_device_name("LIBRESpotify-Spotilava")
 
         self.builder = builder
-        self.session: SpotifySession = None
+        self.session: SpotifySessionAsync = None
 
     def clsoe(self):
         self.logger.info("Spotify: Closing session")
@@ -306,7 +350,7 @@ class LIBRESpotifyWrapper:
         self.logger.info("Spotify: Fetching random access point")
         ap_endpoint = await self._loop.run_in_executor(None, ApResolver.get_random_accesspoint)
         self.logger.info("Spotify: Creating session")
-        session = SpotifySession(
+        session = SpotifySessionAsync(
             SpotifySession.Inner(
                 self.builder.device_type,
                 self.builder.device_name,
@@ -315,6 +359,7 @@ class LIBRESpotifyWrapper:
                 self.builder.device_id,
             ),
             ap_endpoint,
+            loop=self._loop,
         )
         self.logger.info(f"Spotify: Connecting to session <{self.builder.device_id}> [{self.builder.device_name}]")
         await self._loop.run_in_executor(None, session.connect)
@@ -325,40 +370,72 @@ class LIBRESpotifyWrapper:
 
     async def get_track(self, track_id: str):
         track_real = TrackId.from_uri(f"spotify:track:{track_id}")
-        self.logger.info(f"Spotify: Fetching track <{track_id}>")
-        track = await self._loop.run_in_executor(
-            None,
-            self.session.content_feeder().load,
-            track_real,
-            AudioQuality.VERY_HIGH,
-            False,
-            None,
-        )
+        self.logger.info(f"SpotifyTrack: Fetching track <{track_id}>")
+        try:
+            track = await self._loop.run_in_executor(
+                None,
+                self.session.content_feeder().load,
+                track_real,
+                AudioQuality.VERY_HIGH,
+                False,
+                None,
+            )
+        except NoAudioFound as naf:
+            self.logger.error(
+                f"SpotifyTrack: Unable find suitable audio for {track_id}, please report to maintainer with logs!",
+                exc_info=naf,
+            )
+            return None
+        except NoTrackFound:
+            self.logger.error(
+                f"SpotifyTrack: No track (including alt track) found for {track_id}. "
+                "It's possible that your account cannot view this track at all."
+            )
+            return None
+        except RuntimeError as re:
+            self.logger.error(
+                f"SpotifyTrack: RuntimeError while fetching track <{track_id}>, report to maintainer with logs!",
+                exc_info=re,
+            )
+            return None
         if track is None:
             return None
-        self.logger.info(f"Spotify: Fetching track <{track_id}> complete, now fetching stream...")
+        self.logger.info(f"SpotifyTrack: Fetching track <{track_id}> complete, now fetching stream...")
         init_stream = await self._loop.run_in_executor(None, track.input_stream.stream)
-        self.logger.info(f"Spotify: Track <{track_id}> loaded, returning data")
+        self.logger.info(f"SpotifyTrack: Track <{track_id}> loaded, returning data")
         return LIBRESpotifyTrack(
             track_id, track.episode, track.track, init_stream, track.normalization_data, track.metrics, loop=self._loop
         )
 
     async def get_episode(self, episode_id: str):
         episode_real = EpisodeId.from_uri(f"spotify:episode:{episode_id}")
-        self.logger.info(f"Spotify: Fetching episode <{episode_id}>")
-        episode = await self._loop.run_in_executor(
-            None,
-            self.session.content_feeder().load,
-            episode_real,
-            AudioQuality.VERY_HIGH,
-            False,
-            None,
-        )
+        self.logger.info(f"SpotifyEpisode: Fetching episode <{episode_id}>")
+        try:
+            episode = await self._loop.run_in_executor(
+                None,
+                self.session.content_feeder().load,
+                episode_real,
+                AudioQuality.VERY_HIGH,
+                False,
+                None,
+            )
+        except NoAudioFound as naf:
+            self.logger.error(
+                f"SpotifyEpisode: Unable find suitable audio for {episode_id}, please report to maintainer with logs!",
+                exc_info=naf,
+            )
+            return None
+        except RuntimeError as re:
+            self.logger.error(
+                f"SpotifyEpisode: RuntimeError while fetching episode <{episode_id}>, report to maintainer with logs!",
+                exc_info=re,
+            )
+            return None
         if episode is None:
             return None
-        self.logger.info(f"Spotify: Fetching episode <{episode_id}> complete, now fetching stream...")
+        self.logger.info(f"SpotifyEpisode: Fetching episode <{episode_id}> complete, now fetching stream...")
         init_stream = await self._loop.run_in_executor(None, episode.input_stream.stream)
-        self.logger.info(f"Spotify: Episode <{episode_id}> loaded, returning data")
+        self.logger.info(f"SpotifyEpisode: Episode <{episode_id}> loaded, returning data")
         return LIBRESpotifyTrack(
             episode_id,
             episode.episode,
