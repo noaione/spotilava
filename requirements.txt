@@ -1,9 +1,9 @@
 # librespot
--e git+https://github.com/kokarare1212/librespot-python.git@3dcf52608bb94e72ccefcf789a84b5452ef38966#egg=librespot
+-e git+https://github.com/kokarare1212/librespot-python.git@bd71ecde46d6c77f0653cb23d1174b0a6ac7540f#egg=librespot
 sanic==21.9.1
-python-dotenv==0.19.1
+python-dotenv==0.19.2
 mutagen==1.45.1
-aiohttp==3.7.4.post0
+aiohttp==3.8.1
 
 # logging
 coloredlogs==15.0.1
