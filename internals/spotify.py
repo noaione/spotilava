@@ -286,6 +286,21 @@ class SpotifySessionAsync(SpotifySession):
 
         self._actual_reconnect_task: Optional[asyncio.Task] = None
 
+    @property
+    def country(self) -> Optional[str]:
+        """Country code for the connected account"""
+        fallbacks: List[Optional[str]] = [
+            getattr(self, "__country_code", None),
+            getattr(self, "SpotifySessionAsync__country_code", None),
+            getattr(self, "Session__country_code", None),
+            getattr(self, "_Session__country_code", None),
+            getattr(self, "SpotifySession__country_code", None),
+            getattr(self, "_SpotifySession__country_code", None),
+            getattr(self, "_Receiver__country_code", None),
+        ]
+        # First non None occurence
+        return next(filter(None, fallbacks), None)
+
     async def _reconnect(self) -> None:
         """
         Reconnect to the server.
