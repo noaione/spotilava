@@ -12,10 +12,10 @@ from sanic.response import HTTPResponse, file, text
 from internals.logger import RollingFileHandler
 from internals.monke import monkeypatch_load
 from internals.sanic import SpotilavaSanic
-from internals.spotify import LIBRESpotifyWrapper, should_inject_metadata
+from internals.spotify import LIBRESpotifyWrapper
 from internals.tidal.tidal import TidalAPI
-from routes import (episodes_bp, meta_bp, playlists_bp, tidal_tracks_bp,
-                    tracks_bp)
+from routes import (episodes_bp, meta_bp, playlists_bp, tidal_playlists_bp,
+                    tidal_tracks_bp, tracks_bp)
 
 # Monkeypatch librespot
 monkeypatch_load()
@@ -122,6 +122,7 @@ app.blueprint(meta_bp)
 # Tidal extension
 if os.getenv("ENABLE_TIDAL", "0") == "1":
     app.blueprint(tidal_tracks_bp)
+    app.blueprint(tidal_playlists_bp)
 
 
 if __name__ == "__main__":

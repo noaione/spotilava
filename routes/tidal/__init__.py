@@ -9,4 +9,5 @@ The routes collection for Spotilava tidal extension
 
 # flake8: noqa
 
+from .playlists import tidal_playlists_bp
 from .tracks import tidal_tracks_bp
