@@ -13,7 +13,9 @@ from internals.logger import RollingFileHandler
 from internals.monke import monkeypatch_load
 from internals.sanic import SpotilavaSanic
 from internals.spotify import LIBRESpotifyWrapper, should_inject_metadata
-from routes import episodes_bp, meta_bp, playlists_bp, tracks_bp
+from internals.tidal.tidal import TidalAPI
+from routes import (episodes_bp, meta_bp, playlists_bp, tidal_tracks_bp,
+                    tracks_bp)
 
 # Monkeypatch librespot
 monkeypatch_load()
@@ -59,6 +61,23 @@ async def connect_spotify(app: SpotilavaSanic):
     app.spotify = spotify
 
 
+async def connect_tidal(app: SpotilavaSanic):
+    if app.tidal is not None:
+        return
+
+    if os.getenv("ENABLE_TIDAL", "0") != "1":
+        logger.info("App: Tidal is disabled.")
+        return
+    logger.info("App: Creating Tidal wrapper...")
+    tidal = TidalAPI(loop=app.loop)
+    try:
+        await tidal.create()
+    except Exception as e:
+        logger.error(f"App: Failed to create tidal wrapper: {e}", exc_info=e)
+        sys.exit(69)
+    app.tidal = tidal
+
+
 logger.info("App: Initiating spotilava webserver...")
 loop = asyncio.get_event_loop()
 app = SpotilavaSanic("Spotilava")
@@ -74,6 +93,7 @@ else:
     PORT = int(PORT)
 
 app.add_task(connect_spotify)
+app.add_task(connect_tidal)
 
 # For metadata tagging purpose
 if CHUNK_SIZE < 4096:
@@ -99,6 +119,10 @@ app.blueprint(episodes_bp)
 app.blueprint(playlists_bp)
 app.blueprint(meta_bp)
 
+# Tidal extension
+if os.getenv("ENABLE_TIDAL", "0") == "1":
+    app.blueprint(tidal_tracks_bp)
+
 
 if __name__ == "__main__":
     try:
@@ -106,4 +130,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         logger.info("Shutting down...")
         app.spotify.clsoe()
+        if app.tidal:
+            app.loop.run_until_complete(app.tidal.close())
         app.stop()
