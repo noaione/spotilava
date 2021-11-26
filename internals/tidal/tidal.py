@@ -422,7 +422,7 @@ class TidalAPI:
 
         url_path = self.PATH + f"/tracks/{track_id}/playbackinfopostpaywall"
         params = {
-            "audioquality": "NORMAL",
+            "audioquality": track_info.audio_quality,
             "playbackmode": "OFFLINE",
             "assetpresentation": "FULL",
         }
