@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 
 # Spotilava specific
-config/spotify.json
+config/*.json
 *.ogg
 logs/
 _data_test/*
