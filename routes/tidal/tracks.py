@@ -19,6 +19,9 @@ async def get_track_metadata(request: sanic.Request, track_id: str) -> HTTPRespo
     if not app.tidal:
         logger.warning(f"TrackMeta: Unable to fetch <{track_id}> because Tidal is not ready yet!")
         return json({"error": "Tidal not connected.", "code": 500, "data": None}, status=500)
+    if not app.tidal.ready:
+        logger.warning(f"TrackListen: Unable to fetch <{track_id}> because Tidal is not ready yet!")
+        return json({"error": "Tidal not connected.", "code": 500, "data": None}, status=500)
     if not track_id.isalnum():
         logger.warning(f"TrackMeta: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead")
         return json({"error": "Invalid track id, must be alphanumerical", "code": 400, "data": None}, status=500)
@@ -38,6 +41,9 @@ async def get_track_listen(request: sanic.Request, track_id: str):
     CHUNK_SIZE = app.chunk_size
     logger.info(f"TrackListen: Received request for track <{track_id}>")
     if not app.tidal:
+        logger.warning(f"TrackListen: Unable to fetch <{track_id}> because Tidal is not ready yet!")
+        return text("Tidal not connected.", status=500)
+    if not app.tidal.ready:
         logger.warning(f"TrackListen: Unable to fetch <{track_id}> because Tidal is not ready yet!")
         return text("Tidal not connected.", status=500)
     if not track_id.isalnum():
