@@ -50,10 +50,93 @@ BASE_DIR = Path(__file__).absolute().parent.parent.parent
 __all__ = ("TidalTrackStream", "TidalAPI", "should_inject_metadata")
 
 _log = logging.getLogger("Internals.Tidal")
-API_KEYS = {
-    "clientId": "OmDtrzFgyVVL6uW56OnFA2COiabqm",
-    "clientSecret": "zxen1r3pO0hgtOC7j6twMo9UAqngGrmRiWpV7QC1zJ8="
-}
+
+
+class TidalConfig:
+    def __init__(self):
+        cc_s = [
+            122,
+            120,
+            101,
+            110,
+            49,
+            114,
+            51,
+            112,
+            79,
+            48,
+            104,
+            103,
+            116,
+            79,
+            67,
+            55,
+            106,
+            54,
+            116,
+            119,
+            77,
+            111,
+            57,
+            85,
+            65,
+            113,
+            110,
+            103,
+            71,
+            114,
+            109,
+            82,
+            105,
+            87,
+            112,
+            86,
+            55,
+            81,
+            67,
+            49,
+            122,
+            74,
+            56,
+        ]
+        cc_id = [
+            79,
+            109,
+            68,
+            116,
+            114,
+            122,
+            70,
+            103,
+            121,
+            86,
+            86,
+            76,
+            54,
+            117,
+            87,
+            53,
+            54,
+            79,
+            110,
+            70,
+            65,
+            50,
+            67,
+            79,
+            105,
+            97,
+            98,
+            113,
+            109,
+        ]
+
+        cc_s = "".join(chr(c) for c in cc_s)
+        cc_id = "".join(chr(c) for c in cc_id)
+
+        self.client_id: str = cc_id
+        self.client_secret: str = cc_s + "="
+
 
 
 @dataclass
@@ -137,7 +220,6 @@ class TidalTrackStream:
         self.read += len(data)
         self.request.close()
         return await self.decryptor.decrypt(data)
-        
 
 
 class TidalAPI:
@@ -152,7 +234,7 @@ class TidalAPI:
         self._config_path.parent.mkdir(parents=True, exist_ok=True)
         self._loop = loop or asyncio.get_event_loop()
 
-        # https://github.com/tamland/python-tidal/blob/master/tidalapi/__init__.py
+        self.__conf = TidalConfig()
         self.__is_ready = False
         self.__user: TidalUser = None
 
@@ -183,10 +265,7 @@ class TidalAPI:
         await self._loop.run_in_executor(None, f.close)
 
     async def _link_login(self) -> Optional[TidalUser]:
-        data = {
-            "client_id": API_KEYS["clientId"],
-            "scope": "r_usr+w_usr+w_sub"
-        }
+        data = {"client_id": self.__conf.client_id, "scope": "r_usr+w_usr+w_sub"}
 
         async with self.session.post(self.AUTH_PATH + "/device_authorization", data=data) as sesi:
             res = await sesi.json()
@@ -220,8 +299,8 @@ class TidalAPI:
     async def _authorize_link_login(self, device_code: str, expires_in: int, req_interval: int):
         auth_url = self.AUTH_PATH + "/token"
         data = {
-            "client_id": API_KEYS["clientId"],
-            "client_secret": API_KEYS["clientSecret"],
+            "client_id": self.__conf.client_id,
+            "client_secret": self.__conf.client_secret,
             "device_code": device_code,
             "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             "scope": "r_usr+w_usr+w_sub",
@@ -248,8 +327,8 @@ class TidalAPI:
             return True
         url = self.AUTH_PATH + "/token"
         data = {
-            "client_id": API_KEYS["clientId"],
-            "client_secret": API_KEYS["clientSecret"],
+            "client_id": self.__conf.client_id,
+            "client_secret": self.__conf.client_secret,
             "refresh_token": user.refresh,
             "grant_type": "refresh_token",
         }
@@ -325,13 +404,11 @@ class TidalAPI:
 
     async def get_track(self, track_id: str):
         url_path = self.PATH + f"/tracks/{track_id}"
-        
+
         self.logger.info(f"Tidal: Requesting <{track_id}> into Tracks API")
         track_info = await self._get(url_path)
         if track_info is None:
-            self.logger.error(
-                f"Tidal: Unable to find specified track <{track_id}>!"
-            )
+            self.logger.error(f"Tidal: Unable to find specified track <{track_id}>!")
             return None
 
         return TidalTrack.from_track(track_info)
@@ -340,9 +417,7 @@ class TidalAPI:
         self.logger.info(f"TidalTrack: Fetching track <{track_id}>")
         track_info = await self.get_track(track_id)
         if not track_info:
-            self.logger.error(
-                f"Tidal: Unable to find specified track <{track_id}>!"
-            )
+            self.logger.error(f"Tidal: Unable to find specified track <{track_id}>!")
             return None
 
         url_path = self.PATH + f"/tracks/{track_id}/playbackinfopostpaywall"
@@ -356,14 +431,10 @@ class TidalAPI:
         if stream_info is None:
             # Fallback to normal STREAM playback
             params["playbackmode"] = "STREAM"
-            self.logger.warning(
-                f"TidalTrack: Unable to find offline URL, fallback to stream url..."
-            )
+            self.logger.warning(f"TidalTrack: Unable to find offline URL, fallback to stream url...")
             stream_info = await self._get(url_path, params)
             if stream_info is None:
-                self.logger.error(
-                    f"TidalTrack: Unable to find playback URL for track <{track_id}>!"
-                )
+                self.logger.error(f"TidalTrack: Unable to find playback URL for track <{track_id}>!")
                 return None
 
         mf_type = stream_info["manifestMimeType"]
