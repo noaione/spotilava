@@ -67,7 +67,7 @@ In `.env.example` you will find 3 options:
 The other API can be used to fetch about playlist/album/track information before requesting lavaplayer the real URL (`/:track_id/listen`).
 
 ~~I'm planning to implement support for Shows/Podcast too.~~
-Implemented since commit: https://github.com/noaione/spotilava/commit/d54fdd9045d5e54460e72ec65a1f43d97b72267f
+Implemented since commit: [`d54fdd9`](https://github.com/noaione/spotilava/commit/d54fdd9045d5e54460e72ec65a1f43d97b72267f)
 
 ## Extensions
 
@@ -99,7 +99,7 @@ I cannot fix this currently since this is most likely a failure from `librespot-
 
 3. ~~Spotify would froze at `Created new session! device_id xxxxxxxxx` and not finished connecting.~~
 
-This problem might be fixed at commit https://github.com/noaione/spotilava/commit/d1f951f92cad198a784aa32109822f0701817174 since the upstream `librespot-python` fixes the freezing if the previous auth failed, or the client is not disconnected properly.
+This problem might be fixed at commit [`d1f951f`](https://github.com/noaione/spotilava/commit/d1f951f92cad198a784aa32109822f0701817174) since the upstream `librespot-python` fixes the freezing if the previous auth failed, or the client is not disconnected properly.
 
 ## License
 
