@@ -57,7 +57,7 @@ In `.env.example` you will find 3 options:
 ## API Route
 
 - `/:track_id` get the metadata of the track ID. (JSON)
-- `/:track_id/listen` get the track itself, returns the OGG Vorbis stream. (Binary)
+- `/:track_id/listen` get the track itself, returns the OGG Vorbis or MP3 stream. (Binary)
 - `/album/:album_id/` get the list of Album data. (JSON)
 - `/playlist/:playlist_id` get the list of playlist data. (JSON)
 - `/show/:show_id/` get the list of Show/Podcast data. (JSON)
@@ -67,7 +67,11 @@ In `.env.example` you will find 3 options:
 The other API can be used to fetch about playlist/album/track information before requesting lavaplayer the real URL (`/:track_id/listen`).
 
 ~~I'm planning to implement support for Shows/Podcast too.~~
-Implemented since commit: https://github.com/noaione/spotilava/commit/d54fdd9045d5e54460e72ec65a1f43d97b72267f
+Implemented since commit: [`d54fdd9`](https://github.com/noaione/spotilava/commit/d54fdd9045d5e54460e72ec65a1f43d97b72267f)
+
+## Extensions
+
+Spotilava includes some extension that support other premium music provider like Tidal, learn more [here](EXTENSIONS.md).
 
 ## How it works?
 
@@ -93,11 +97,9 @@ Lavaplayer would just return an `UNDEFINED_LENGTH` a.k.a the longest number you 
 
 I cannot fix this currently since this is most likely a failure from `librespot-python` itself. You can just start the server again to see if it's works.
 
-3. Spotify would froze at `Created new session! device_id xxxxxxxxx` and not finished connecting.
+3. ~~Spotify would froze at `Created new session! device_id xxxxxxxxx` and not finished connecting.~~
 
-This problem is unknown to me currently, this would also make your terminal (in Windows?) cannot be stopped, you need to close the whole terminal.
-
-Just rerun the `app.py` again and see if it would froze at that section again.
+This problem might be fixed at commit [`d1f951f`](https://github.com/noaione/spotilava/commit/d1f951f92cad198a784aa32109822f0701817174) since the upstream `librespot-python` fixes the freezing if the previous auth failed, or the client is not disconnected properly.
 
 ## License
 

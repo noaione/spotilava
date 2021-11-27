@@ -47,7 +47,7 @@ from mutagen.oggvorbis import OggVorbis
 from .errors import NoAudioFound, NoTrackFound
 from .utils import complex_walk
 
-BASE_DIR = Path(__name__).parent.parent
+BASE_DIR = Path(__file__).parent.parent
 _log = logging.getLogger("Internals.Spotify")
 
 

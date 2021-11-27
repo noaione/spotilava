@@ -13,3 +13,5 @@ from .episodes import episodes_bp
 from .meta import meta_bp
 from .playlists import playlists_bp
 from .tracks import tracks_bp
+
+from .tidal import *

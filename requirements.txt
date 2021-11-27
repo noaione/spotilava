@@ -1,9 +1,15 @@
-# librespot
--e git+https://github.com/kokarare1212/librespot-python.git@bd71ecde46d6c77f0653cb23d1174b0a6ac7540f#egg=librespot
+# General requirements
 sanic==21.9.1
 python-dotenv==0.19.2
 mutagen==1.45.1
 aiohttp==3.8.1
+
+# Spotify specific requirements
+-e git+https://github.com/kokarare1212/librespot-python.git@bd71ecde46d6c77f0653cb23d1174b0a6ac7540f#egg=librespot
+
+# Tidal specific requirements
+pycryptodome==3.11.0
+orjson==3.6.4
 
 # logging
 coloredlogs==15.0.1
