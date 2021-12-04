@@ -70,11 +70,11 @@ async def get_track_listen(request: sanic.Request, track_id: str):
             return raw(b"", status=404)
         return text("Track not found.", status=404)
 
-    header_range = request.headers.get("Range")
+    header_range = request.headers.get("Range") or request.headers.get("range")
     start_read = 0
     end_read = -1
     if header_range is not None:
-        range_search = re.search(r"^bytes=(?P<start>[0-9]+?)-(?P<end>[0-9]+?)$", header_range)
+        range_search = re.search(r"^bytes\=(?P<start>[0-9]+?)-(?P<end>[0-9]+?)?$", header_range)
         if range_search is not None:
             start_read = int(range_search.group("start"))
             end_read = range_search.group("end")
@@ -92,7 +92,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         content_length += len(extra_frame)
 
     if meth == "head":
-        logger.info(f"TrackListen: Sending track <{track_id}> metadata")
+        logger.info(f"TrackListen(HEAD): Sending track <{track_id}> metadata")
         # Response to a HEAD request with some header metadata
         return raw(
             b"",
@@ -105,7 +105,13 @@ async def get_track_listen(request: sanic.Request, track_id: str):
             status=200,
         )
 
-    if end_read >= start_read:
+    should_check_bytes = True
+    if end_read == -1:
+        should_check_bytes = False
+        end_read = content_length
+
+    if start_read >= end_read and should_check_bytes:
+        logger.warning(f"TrackListen: Sending empty track <{track_id}> since range is invalid")
         return raw(
             b"",
             status=206,
@@ -113,26 +119,24 @@ async def get_track_listen(request: sanic.Request, track_id: str):
             content_type="audio/ogg"
         )
 
-    should_check_bytes = True
-    if end_read == -1:
-        should_check_bytes = False
-        end_read = content_length
-
     headers = {
         "Content-Length": str(content_length),
         "Content-Disposition": f'inline; filename="track_{track_id}{file_ext}"',
     }
     if header_range is not None:
         headers["Content-Range"] = f"bytes {start_read}-{end_read}/{content_length}"
+        headers["Accept-Ranges"] = "bytes"
+        headers["Content-Length"] = str(end_read - start_read)
 
     # Streaming function
     async def track_stream(response: StreamingHTTPResponse):
         maximum_read = find_track.input_stream.available()
+        logger.info(f"TrackListen: Streaming track <{track_id}> with bytes {start_read}-{end_read}")
         if start_read == 0:
             await response.write(first_data)
         else:
             # Seek to target start
-            logger.info(f"TrackListen: Seeking to {start_read} bytes in <{track_id}>")
+            logger.debug(f"TrackListen: Seeking to bytes {start_read} in <{track_id}>")
             await find_track.seek_to(start_read)
             maximum_read = end_read - start_read
         while find_track.input_stream.available() > 0:
