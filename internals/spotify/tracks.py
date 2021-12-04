@@ -34,6 +34,8 @@ from librespot.audio.decoders import AudioQuality
 from librespot.proto import Metadata_pb2 as Metadata
 from librespot.structure import AudioQualityPicker
 
+__all__ = ("AutoFallbackAudioQuality",)
+
 
 class AutoFallbackAudioQuality(AudioQualityPicker):
     logger = logging.getLogger("Spotilava:Player:AutoFallbackAudioQuality")

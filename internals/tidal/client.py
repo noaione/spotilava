@@ -153,7 +153,6 @@ class TidalConfig:
             self.client_id = self.client_id[::-1]
 
 
-
 @dataclass
 class TidalTrackDecryptor:
     encryption_key: Optional[str] = None

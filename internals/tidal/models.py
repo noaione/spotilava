@@ -23,17 +23,13 @@ class TidalUser:
             "cc": self.cc,
             "token": self.token,
             "refresh": self.refresh,
-            "expires_at": self.expires_at
+            "expires_at": self.expires_at,
         }
 
     @classmethod
     def from_dict(cls: Type[TidalUser], data: dict) -> TidalUser:
         return cls(
-            id=data["id"],
-            cc=data["cc"],
-            token=data["token"],
-            refresh=data["refresh"],
-            expires_at=data["expires_at"]
+            id=data["id"], cc=data["cc"], token=data["token"], refresh=data["refresh"], expires_at=data["expires_at"]
         )
 
 
@@ -67,6 +63,7 @@ class TidalUser:
     'mixes': {'MASTER_TRACK_MIX': '014ffa548610ea8550fc0e8b6a5be3', 'TRACK_MIX': '001bb518e6d7c011773a045b2f1f21'}
 }
 """
+
 
 @dataclass
 class TidalTrack:
@@ -103,7 +100,7 @@ class TidalTrack:
             image=image,
             artists=artists,
             duration=duration,
-            audio_quality=audio_quality
+            audio_quality=audio_quality,
         )
 
     def to_json(self):
@@ -113,7 +110,7 @@ class TidalTrack:
             "album": self.album,
             "image": self.image,
             "artists": self.artists,
-            "duration": self.duration
+            "duration": self.duration,
         }
 
 
@@ -130,18 +127,10 @@ class TidalArtist:
             picture = picture.replace("-", "/")
             picture = f"https://resources.tidal.com/images/{picture}/1280x1280.jpg"
 
-        return cls(
-            id=str(artist["id"]),
-            name=artist["name"],
-            image=picture
-        )
+        return cls(id=str(artist["id"]), name=artist["name"], image=picture)
 
     def to_json(self):
-        return {
-            "id": self.id,
-            "name": self.name,
-            "image": self.image
-        }
+        return {"id": self.id, "name": self.name, "image": self.image}
 
 
 @dataclass
@@ -164,14 +153,8 @@ class TidalAlbum:
             artists.append(TidalArtist.from_artist(artist))
         if not artists:
             artists = [TidalArtist.from_artist(album["artist"])]
-        
-        return cls(
-            id=str(album["id"]),
-            name=album["title"],
-            image=image,
-            artists=artists,
-            tracks=[]
-        )
+
+        return cls(id=str(album["id"]), name=album["title"], image=image, artists=artists, tracks=[])
 
     def to_json(self):
         tracks = []
@@ -180,13 +163,7 @@ class TidalAlbum:
         artists = []
         for artist in self.artists:
             artists.append(artist.to_json())
-        return {
-            "id": self.id,
-            "name": self.name,
-            "image": self.image,
-            "artists": artists,
-            "tracks": tracks
-        }
+        return {"id": self.id, "name": self.name, "image": self.image, "artists": artists, "tracks": tracks}
 
 
 @dataclass
@@ -209,22 +186,10 @@ class TidalPlaylist:
             if creator_id == 0:
                 creator = "TIDAL"
 
-        return cls(
-            id=str(playlist["uuid"]),
-            name=playlist["title"],
-            image=image,
-            creator=creator,
-            tracks=[]
-        )
+        return cls(id=str(playlist["uuid"]), name=playlist["title"], image=image, creator=creator, tracks=[])
 
     def to_json(self):
         tracks = []
         for track in self.tracks:
             tracks.append(track.to_json())
-        return {
-            "id": self.id,
-            "name": self.name,
-            "image": self.image,
-            "creator": self.creator,
-            "tracks": tracks
-        }
+        return {"id": self.id, "name": self.name, "image": self.image, "creator": self.creator, "tracks": tracks}

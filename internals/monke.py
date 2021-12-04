@@ -32,7 +32,7 @@ import librespot.audio
 from librespot.audio import CdnFeedHelper
 from librespot.metadata import EpisodeId, PlayableId, TrackId
 
-from .audio import AutoFallbackAudioQuality
+from .spotify import AutoFallbackAudioQuality
 from .errors import NoAudioFound, NoTrackFound
 
 if TYPE_CHECKING:

@@ -11,5 +11,6 @@ to use async.
 
 # flake8: noqa
 
+from .client import *
+from .enums import *
 from .models import *
-from .tidal import *
