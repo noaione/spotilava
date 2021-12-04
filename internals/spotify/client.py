@@ -50,7 +50,7 @@ from .models import *
 BASE_DIR = Path(__file__).absolute().parent.parent.parent
 _log = logging.getLogger("Internals.Spotify")
 
-__all__ = ("LIBRESpotifyTrack", "LIBRESpotifyWrapper")
+__all__ = ("LIBRESpotifyTrack", "LIBRESpotifyWrapper", "should_inject_metadata")
 
 
 @dataclass
