@@ -79,6 +79,17 @@ class LIBRESpotifyTrack:
         )
         return await execute
 
+    async def seek_to(self, location: int) -> None:
+        """
+        Skip to the given location.
+        """
+        await self.loop.run_in_executor(None, self.input_stream.seek, location)
+
+    async def close(self) -> None:
+        """
+        Close the track.
+        """
+        await self.loop.run_in_executor(None, self.input_stream.close)
 
 class SpotifySessionAsync(SpotifySession):
     """
