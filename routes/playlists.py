@@ -102,3 +102,38 @@ async def get_show_information(request: sanic.Request, show_id: str) -> HTTPResp
 
     show_data = show_info.to_json()
     return json({"error": "Success", "code": 200, "data": show_data})
+
+
+@playlists_bp.get("/artist/<artist_id>")
+async def get_artist_contents(request: sanic.Request, artist_id: str) -> HTTPResponse:
+    # 0U2Emr9cdZNcbqSoKoWb8c
+    app: SpotilavaSanic = request.app
+    logger.info(f"ArtistContents: Received request for artist <{artist_id}>")
+    if not app.spotify:
+        logger.warning(f"ArtistContents: Unable to fetch <{artist_id}> because Spotify is not ready yet!")
+        return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
+    if len(artist_id) != 22:
+        logger.warning(
+            f"ArtistContents: Artist <{artist_id}> is invalid, expected 22 length, got {len(artist_id)} instead"
+        )
+        return json(
+            {
+                "error": f"Invalid artist id, expected 22 char length, got {len(artist_id)} instead",
+                "code": 400,
+                "data": None,
+            },
+            status=500,
+        )
+    if not artist_id.isalnum():
+        logger.warning(
+            f"ArtistContents: Artist <{artist_id}> is invalid, expected alphanumeric, got {artist_id} instead"
+        )
+        return json({"error": "Invalid artist id, must be alphanumerical", "code": 400, "data": None}, status=500)
+
+    playlist_info = await app.spotify.get_artist_tracks(artist_id)
+    if playlist_info is None:
+        logger.warning(f"ArtistContents: Unable to find top tracks for <{artist_id}>")
+        return json({"error": "Artist not found.", "code": 404, "data": None}, status=404)
+
+    playlist_meta = playlist_info.to_json()
+    return json({"error": "Success", "code": 200, "data": playlist_meta})

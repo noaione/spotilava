@@ -12,7 +12,7 @@ I am not responsible if your account got banned, this webserver still possibly b
 I would recommend a burner premium account.
 
 ## Features
-- [x] API routes to fetch Album/Playlist/Show information (including Track and Episode)
+- [x] API routes to fetch Album/Playlist/Artist/Show information (including Track and Episode)
 - [x] Support listening to Track natively
 - [x] Support listening to Podcast/episode natively
 - [x] Automatically use the best possible audio quality and format
@@ -61,6 +61,7 @@ In `.env.example` you will find 3 options:
 - `/album/:album_id/` get the list of Album data. (JSON)
 - `/playlist/:playlist_id` get the list of playlist data. (JSON)
 - `/show/:show_id/` get the list of Show/Podcast data. (JSON)
+- `/artist/:artist_id/` get the list of artist top tracks. (JSON) **[See note at the bottom]**
 - `/episode/:episode_id` get the metadata of a podcast episode. (JSON)
 - `/episode/:episode_id/listen` get the episode itself, returns an OGG Vorbis or MP3 stream. (Binary)
 
@@ -68,6 +69,9 @@ The other API can be used to fetch about playlist/album/track information before
 
 ~~I'm planning to implement support for Shows/Podcast too.~~
 Implemented since commit: [`d54fdd9`](https://github.com/noaione/spotilava/commit/d54fdd9045d5e54460e72ec65a1f43d97b72267f)
+
+**Note on top artist tracks**:<br>
+It will use your account country as what the top tracks are for the artist in that country.
 
 ## Extensions
 
@@ -100,6 +104,10 @@ I cannot fix this currently since this is most likely a failure from `librespot-
 3. ~~Spotify would froze at `Created new session! device_id xxxxxxxxx` and not finished connecting.~~
 
 This problem might be fixed at commit [`d1f951f`](https://github.com/noaione/spotilava/commit/d1f951f92cad198a784aa32109822f0701817174) since the upstream `librespot-python` fixes the freezing if the previous auth failed, or the client is not disconnected properly.
+
+4. Lavaplayer/Lavalink sometimes will throws error at the very end of the tracks
+
+Unknown problems to me, some tracks (mainly OGG one) will throws errors after the track playback is ended. See [`#4`](https://github.com/noaione/spotilava/issues/4)
 
 ## License
 

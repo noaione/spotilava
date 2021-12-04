@@ -140,6 +140,20 @@ class SpotifyArtist:
 
 
 @dataclass
+class SpotifyArtistWithTrack(SpotifyArtist):
+    tracks: List[SpotifyTrack] = field(default_factory=list)
+
+    @classmethod
+    def from_artist(cls: Type[SpotifyArtistWithTrack], artist: dict) -> SpotifyArtistWithTrack:
+        return super().from_artist(artist)
+
+    def to_json(self):
+        base = super().to_json()
+        base["tracks"] = [track.to_json() for track in self.tracks]
+        return base
+
+
+@dataclass
 class SpotifyAlbum:
     id: str
     name: str
@@ -566,6 +580,39 @@ class LIBRESpotifyWrapper:
                 playlist_data.tracks = current_tracks
             return playlist_data
         return None
+
+    async def get_artist_tracks(self, artist_id: str):
+        token = await self._get_token()
+
+        header_token = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+
+        async with aiohttp.ClientSession(headers=header_token) as client:
+            self.logger.info(f"Spotify: Requesting <{artist_id}> into Artist API")
+            async with client.get(f"https://api.spotify.com/v1/artists/{artist_id}") as resp:
+                if resp.status != 200:
+                    return None
+                data = await resp.json()
+
+        if complex_walk(data, "type") != "artist":
+            self.logger.warning(f"Spotify: Artist <{artist_id}> is not an artist")
+            return None
+
+        artist_info = SpotifyArtistWithTrack.from_artist(data)
+        country_code = self.session.country
+
+        async with aiohttp.ClientSession(headers=header_token) as client:
+            self.logger.info(f"Spotify: Requesting <{artist_id}> into Artist Top Tracks API")
+            async with client.get(
+                f"https://api.spotify.com/v1/artists/{artist_id}/top-tracks",
+                params={"market": country_code},
+            ) as resp:
+                tracks_data = await resp.json()
+
+        tracks: List[SpotifyTrack] = []
+        for item in tracks_data.get("tracks", []):
+            tracks.append(SpotifyTrack.from_track(item))
+        artist_info.tracks = tracks
+        return artist_info
 
     async def get_show(self, show_id: str):
         token = await self._get_token()
