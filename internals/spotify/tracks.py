@@ -27,10 +27,10 @@ This implements the rest of AAC and MP3 encoding quality.
 from __future__ import annotations
 
 import logging
+from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional
 
 from librespot.audio import SuperAudioFormat
-from librespot.audio.decoders import AudioQuality
 from librespot.proto import Metadata_pb2 as Metadata
 from librespot.structure import AudioQualityPicker
 
@@ -40,33 +40,37 @@ if TYPE_CHECKING:
 __all__ = ("AutoFallbackAudioQuality",)
 
 
-class AudioQualityPatched(AudioQuality):
+class AudioQualityPatched(Enum):
+    NORMAL = 0x00
+    HIGH = 0x01
+    VERY_HIGH = 0x02
+
     @staticmethod
-    def get_quality(audio_format: AudioFile.Format) -> AudioQuality:
+    def get_quality(audio_format: AudioFile.Format) -> AudioQualityPatched:
         if audio_format in [
             AudioFile.MP3_96,
             AudioFile.OGG_VORBIS_96,
             AudioFile.AAC_24_NORM,
         ]:
-            return AudioQuality.NORMAL
+            return AudioQualityPatched.NORMAL
         if audio_format in [
                 AudioFile.MP3_160,
                 AudioFile.MP3_160_ENC,
                 AudioFile.OGG_VORBIS_160,
                 AudioFile.AAC_24,
         ]:
-            return AudioQuality.HIGH
+            return AudioQualityPatched.HIGH
         if audio_format in [
                 AudioFile.MP3_320,
                 AudioFile.MP3_256,
                 AudioFile.OGG_VORBIS_320,
                 AudioFile.AAC_48,
         ]:
-            return AudioQuality.VERY_HIGH
+            return AudioQualityPatched.VERY_HIGH
         raise RuntimeError(f"Unknown format: {audio_format}")
 
     @classmethod
-    def from_super(cls, super_audio: AudioQuality) -> AudioQualityPatched:
+    def from_super(cls, super_audio: AudioQualityPatched) -> AudioQualityPatched:
         return cls(super_audio.value)
 
     def get_matches(self, files: List[AudioFile]) -> List[AudioFile]:
@@ -79,9 +83,9 @@ class AudioQualityPatched(AudioQuality):
 
 class AutoFallbackAudioQuality(AudioQualityPicker):
     logger = logging.getLogger("Spotilava:Player:AutoFallbackAudioQuality")
-    preferred: AudioQuality
+    preferred: AudioQualityPatched
 
-    def __init__(self, preferred: AudioQuality) -> None:
+    def __init__(self, preferred: AudioQualityPatched) -> None:
         self.preferred: AudioQualityPatched = preferred
         if not isinstance(preferred, AudioQualityPatched):
             self.preferred: AudioQualityPatched = AudioQualityPatched.from_super(preferred)
