@@ -67,17 +67,22 @@ async def get_track_listen(request: sanic.Request, track_id: str):
     logger.debug(f"TrackListen: Reading first {CHUNK_SIZE} bytes of <{track_id}>")
     first_data = await find_track.read_bytes(CHUNK_SIZE)
     first_data, content_type, file_ext = should_inject_metadata(first_data, find_track)
+    # Opus silence frame
+    extra_frame = b"\xF8\xFF\xFE"
 
     # Streaming function
     async def track_stream(response: StreamingHTTPResponse):
         await response.write(first_data)
         while find_track.input_stream.available() > 0:
             data = await find_track.read_bytes(CHUNK_SIZE)
-            if data == -1:
-                break
             await response.write(data)
+        # Pad with silence frame if it's ogg
+        if "ogg" in file_ext:
+            await response.write(extra_frame)
 
     content_length = len(first_data) + find_track.input_stream.available()
+    if "ogg" in file_ext:
+        content_length += len(extra_frame)
 
     headers = {
         "Content-Length": str(content_length),

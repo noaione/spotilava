@@ -75,6 +75,8 @@ async def get_episode_listen(request: sanic.Request, episode_id: str) -> HTTPRes
     logger.debug(f"EpisodeListen: Reading first {CHUNK_SIZE} bytes of <{episode_id}>")
     first_data = await episode_info.read_bytes(CHUNK_SIZE)
     first_data, content_type, file_ext = should_inject_metadata(first_data, episode_info)
+    # Opus silence frame
+    extra_frame = b"\xF8\xFF\xFE"
 
     # Streaming function
     async def episode_stream(response: StreamingHTTPResponse):
@@ -82,8 +84,14 @@ async def get_episode_listen(request: sanic.Request, episode_id: str) -> HTTPRes
         while episode_info.input_stream.available() > 0:
             data = await episode_info.read_bytes(CHUNK_SIZE)
             await response.write(data)
+        # Pad with silence frame if it's ogg
+        if "ogg" in file_ext:
+            await response.write(extra_frame)
 
     content_length = len(first_data) + episode_info.input_stream.available()
+    if "ogg" in file_ext:
+        content_length += len(extra_frame)
+
     headers = {
         "Content-Length": str(content_length),
         "Content-Disposition": f'inline; filename="episode_{episode_id}{file_ext}"',
