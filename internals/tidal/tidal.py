@@ -40,6 +40,7 @@ from Crypto.Util import Counter
 from mutagen.flac import FLAC
 from mutagen.mp4 import MP4 as ALAC
 
+from .enums import TidalAudioQuality
 from .models import TidalAlbum, TidalPlaylist, TidalTrack, TidalUser
 
 if TYPE_CHECKING:
@@ -54,6 +55,8 @@ _log = logging.getLogger("Internals.Tidal")
 
 class TidalConfig:
     def __init__(self):
+        import random
+
         cc_s = [
             122,
             120,
@@ -130,12 +133,24 @@ class TidalConfig:
             113,
             109,
         ]
+        i = random.randint(0, len(cc_s) - 1)
+        for _ in range(i):
+            cc_s.reverse()
+        j = random.randint(0, len(cc_id) - 1)
+        for _ in range(j):
+            cc_id.reverse()
 
         cc_s = "".join(chr(c) for c in cc_s)
         cc_id = "".join(chr(c) for c in cc_id)
 
         self.client_id: str = cc_id
-        self.client_secret: str = cc_s + "="
+        self.client_secret: str = cc_s
+
+        for _ in range(i):
+            self.client_secret = self.client_secret[::-1]
+        self.client_secret += "="
+        for _ in range(j):
+            self.client_id = self.client_id[::-1]
 
 
 
@@ -413,6 +428,17 @@ class TidalAPI:
 
         return TidalTrack.from_track(track_info)
 
+    async def _get_stream_info(self, track: TidalTrack, want: str = "OFFLINE"):
+        url_path = self.PATH + f"/tracks/{track.id}/playbackinfopostpaywall"
+        params = {
+            "audioquality": track.audio_quality.value,
+            "playbackmode": want,
+            "assetpresentation": "FULL",
+        }
+        self.logger.info(f"TidalTrack: Fetching {want} URL information for <{track.id}>")
+        stream_info = await self._get(url_path, params)
+        return stream_info
+
     async def get_track_stream(self, track_id: str):
         self.logger.info(f"TidalTrack: Fetching track <{track_id}>")
         track_info = await self.get_track(track_id)
@@ -420,22 +446,37 @@ class TidalAPI:
             self.logger.error(f"Tidal: Unable to find specified track <{track_id}>!")
             return None
 
-        url_path = self.PATH + f"/tracks/{track_id}/playbackinfopostpaywall"
-        params = {
-            "audioquality": track_info.audio_quality,
-            "playbackmode": "OFFLINE",
-            "assetpresentation": "FULL",
-        }
-        self.logger.info(f"TidalTrack: Fetching offline URL information for <{track_id}>")
-        stream_info = await self._get(url_path, params)
+        stream_info = await self._get_stream_info(track_info)
         if stream_info is None:
-            # Fallback to normal STREAM playback
-            params["playbackmode"] = "STREAM"
-            self.logger.warning(f"TidalTrack: Unable to find offline URL, fallback to stream url...")
-            stream_info = await self._get(url_path, params)
+            stream_info = await self._get_stream_info(track_info, "STREAM")
             if stream_info is None:
-                self.logger.error(f"TidalTrack: Unable to find playback URL for track <{track_id}>!")
+                self.logger.error(f"Tidal: Unable to find any stream URL for track <{track_id}>!")
                 return None
+        else:
+            audio_qual = TidalAudioQuality(stream_info["audioQuality"])
+            if audio_qual != track_info.audio_quality:
+                self.logger.warning(
+                    f"Tidal: Audio quality <{audio_qual}> is not available for track <{track_id}>, trying STREAM"
+                )
+                stream_info_st_mode = await self._get_stream_info(track_info, "STREAM")
+                if stream_info_st_mode is None:
+                    self.logger.error(
+                        f"Tidal: Unable to find any stream URL for track <{track_id}> with STREAM mode!"
+                        f" using <{audio_qual}> quality"
+                    )
+                else:
+                    audio_qual_stream = TidalAudioQuality(stream_info_st_mode["audioQuality"])
+                    if audio_qual_stream > audio_qual:
+                        stream_info = stream_info_st_mode
+                        self.logger.info(
+                            f"Tidal(Stream): Audio quality <{audio_qual_stream}> is available "
+                            f"for track <{track_id}>, using it"
+                        )
+                    else:
+                        self.logger.info(
+                            f"Tidal(Offline): Audio quality <{track_info.audio_quality}> is unavailable "
+                            f"for track <{track_id}>, using <{audio_qual}> quality"
+                        )
 
         mf_type = stream_info["manifestMimeType"]
         if "vnd.tidal.bts" not in mf_type:

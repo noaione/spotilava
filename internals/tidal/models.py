@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional, Type
 
+from .enums import TidalAudioQuality
+
 __all__ = ("TidalTrack", "TidalArtist", "TidalAlbum", "TidalPlaylist", "TidalUser")
 
 
@@ -74,7 +76,7 @@ class TidalTrack:
     image: Optional[str]
     artists: List[str]
     duration: int
-    audio_quality: Optional[str]
+    audio_quality: Optional[TidalAudioQuality]
 
     @classmethod
     def from_track(cls: Type[TidalTrack], track: dict) -> TidalTrack:
@@ -91,6 +93,8 @@ class TidalTrack:
             artists = [track["artist"]["name"]]
         duration = track.get("duration", -1)
         audio_quality = track.get("audioQuality", None)
+        if audio_quality is not None:
+            audio_quality = TidalAudioQuality(audio_quality)
 
         return cls(
             id=str(track["id"]),
