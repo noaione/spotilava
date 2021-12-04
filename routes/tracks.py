@@ -46,6 +46,7 @@ async def get_track_metadata(request: sanic.Request, track_id: str) -> HTTPRespo
 async def get_track_listen(request: sanic.Request, track_id: str):
     app: SpotilavaSanic = request.app
     CHUNK_SIZE = app.chunk_size
+    meth = request.method.lower()
     logger.info(f"TrackListen: Received request for track <{track_id}>")
     if not app.spotify:
         logger.warning(f"TrackListen: Unable to fetch <{track_id}> because Spotify is not ready yet!")
@@ -60,9 +61,13 @@ async def get_track_listen(request: sanic.Request, track_id: str):
     find_track = await app.spotify.get_track(track_id)
     if find_track is None:
         logger.warning(f"TrackListen: Unable to find track <{track_id}>")
+        if meth == "head":
+            return raw(b"", status=404)
         return text("Track not found.", status=404)
     if find_track.track is None:
         logger.warning(f"TrackListen: Unable to find track <{track_id}>, track meta is missing")
+        if meth == "head":
+            return raw(b"", status=404)
         return text("Track not found.", status=404)
 
     header_range = request.headers.get("Range")
@@ -86,7 +91,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
     if "ogg" in file_ext:
         content_length += len(extra_frame)
 
-    if request.method.lower() == "head":
+    if meth == "head":
         logger.info(f"TrackListen: Sending track <{track_id}> metadata")
         # Response to a HEAD request with some header metadata
         return raw(
@@ -97,7 +102,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
                 "Content-Type": content_type,
                 "Content-Length": str(content_length),
             },
-            status=100
+            status=200,
         )
 
     if end_read >= start_read:
