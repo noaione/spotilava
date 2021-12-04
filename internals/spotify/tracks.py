@@ -28,14 +28,11 @@ from __future__ import annotations
 
 import logging
 from enum import Enum
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import Any, List, Optional
 
 from librespot.audio import SuperAudioFormat
 from librespot.proto import Metadata_pb2 as Metadata
 from librespot.structure import AudioQualityPicker
-
-if TYPE_CHECKING:
-    from librespot.proto.Metadata_pb2 import AudioFile
 
 __all__ = ("AutoFallbackAudioQuality",)
 
@@ -46,25 +43,25 @@ class AudioQualityPatched(Enum):
     VERY_HIGH = 0x02
 
     @staticmethod
-    def get_quality(audio_format: AudioFile.Format) -> AudioQualityPatched:
+    def get_quality(audio_format: Metadata.AudioFile.Format) -> AudioQualityPatched:
         if audio_format in [
-            AudioFile.MP3_96,
-            AudioFile.OGG_VORBIS_96,
-            AudioFile.AAC_24_NORM,
+            Metadata.AudioFile.MP3_96,
+            Metadata.AudioFile.OGG_VORBIS_96,
+            Metadata.AudioFile.AAC_24_NORM,
         ]:
             return AudioQualityPatched.NORMAL
         if audio_format in [
-                AudioFile.MP3_160,
-                AudioFile.MP3_160_ENC,
-                AudioFile.OGG_VORBIS_160,
-                AudioFile.AAC_24,
+            Metadata.AudioFile.MP3_160,
+            Metadata.AudioFile.MP3_160_ENC,
+            Metadata.AudioFile.OGG_VORBIS_160,
+            Metadata.AudioFile.AAC_24,
         ]:
             return AudioQualityPatched.HIGH
         if audio_format in [
-                AudioFile.MP3_320,
-                AudioFile.MP3_256,
-                AudioFile.OGG_VORBIS_320,
-                AudioFile.AAC_48,
+            Metadata.AudioFile.MP3_320,
+            Metadata.AudioFile.MP3_256,
+            Metadata.AudioFile.OGG_VORBIS_320,
+            Metadata.AudioFile.AAC_48,
         ]:
             return AudioQualityPatched.VERY_HIGH
         raise RuntimeError(f"Unknown format: {audio_format}")
@@ -73,7 +70,7 @@ class AudioQualityPatched(Enum):
     def from_super(cls, super_audio: AudioQualityPatched) -> AudioQualityPatched:
         return cls(super_audio.value)
 
-    def get_matches(self, files: List[AudioFile]) -> List[AudioFile]:
+    def get_matches(self, files: List[Metadata.AudioFile]) -> List[Metadata.AudioFile]:
         file_lists = []
         for file in files:
             if hasattr(file, "format") and AudioQualityPatched.get_quality(file.format) == self:
