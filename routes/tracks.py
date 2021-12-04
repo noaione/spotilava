@@ -73,6 +73,8 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         await response.write(first_data)
         while find_track.input_stream.available() > 0:
             data = await find_track.read_bytes(CHUNK_SIZE)
+            if data == -1:
+                break
             await response.write(data)
 
     content_length = len(first_data) + find_track.input_stream.available()
