@@ -113,7 +113,9 @@ async def get_track_listen(request: sanic.Request, track_id: str):
             content_type="audio/ogg"
         )
 
+    should_check_bytes = True
     if end_read == -1:
+        should_check_bytes = False
         end_read = content_length
 
     headers = {
@@ -126,15 +128,16 @@ async def get_track_listen(request: sanic.Request, track_id: str):
     # Streaming function
     async def track_stream(response: StreamingHTTPResponse):
         maximum_read = find_track.input_stream.available()
-        if first_data == 0:
+        if start_read == 0:
             await response.write(first_data)
         else:
             # Seek to target start
+            logger.info(f"TrackListen: Seeking to {start_read} bytes in <{track_id}>")
             await find_track.seek_to(start_read)
             maximum_read = end_read - start_read
         while find_track.input_stream.available() > 0:
             THIS_MUCH = CHUNK_SIZE
-            if THIS_MUCH > maximum_read:
+            if THIS_MUCH > maximum_read and should_check_bytes:
                 THIS_MUCH = maximum_read
             data = await find_track.read_bytes(THIS_MUCH)
             maximum_read -= len(data)
