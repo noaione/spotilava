@@ -41,6 +41,7 @@ from librespot.audio.decoders import AudioQuality
 from librespot.core import ApResolver
 from librespot.core import Session as SpotifySession
 from librespot.metadata import EpisodeId, TrackId
+from librespot.proto import Authentication_pb2 as Authentication
 from librespot.proto import Metadata_pb2 as Metadata
 from mutagen.mp3 import MP3
 from mutagen.oggvorbis import OggVorbis
@@ -121,7 +122,31 @@ class SpotifySessionAsync(SpotifySession):
         """
         Reconnect to the server.
         """
-        await self._loop.run_in_executor(None, super().reconnect)
+        if self.connection is not None:
+            self.logger.info("SpotifyReconnect: Closing existing connection...")
+            await self._loop.run_in_executor(None, self.connection.close)
+            self.__receiver.stop()
+
+        self.logger.info("SpotifyReconnect: Fetching random access point")
+        ap_endpoint = await self._loop.run_in_executor(None, ApResolver.get_random_accesspoint)
+        self.logger.info("SpotifyReconnect: Creating connection socket...")
+        self.connection = await self._loop.run_in_executor(
+            None, SpotifySession.ConnectionHolder.create, ap_endpoint, self.__inner.conf
+        )
+        self.logger.info("SpotifyReconnect: Connecting to Spotify...")
+        await self._loop.run_in_executor(None, self.connect)
+        self.logger.info("SpotifyReconnect: Connected to Spotify, authenticating...")
+        log_credentials = Authentication.LoginCredentials(
+            typ=self.__ap_welcome.reusable_auth_credentials_type,
+            username=self.__ap_welcome.canonical_username,
+            auth_data=self.__ap_welcome.reusable_auth_credentials,
+        )
+        await self._loop.run_in_executor(None, self.__authenticate_partial, log_credentials)
+        try:
+            canon_username = self.__ap_welcome.canonical_username
+            self.logger.info(f"SpotifyReconnect: Authenticated! Now connecting as {canon_username}!")
+        except Exception:
+            self.logger.info("SpotifyReconnect: Reauthenticated!")
 
     def _reconnect_done(self):
         self.logger.info("Connection reestablished again, removing task...")
