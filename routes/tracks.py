@@ -2,7 +2,7 @@ import logging
 import re
 
 import sanic
-from sanic.response import HTTPResponse, StreamingHTTPResponse, json, stream, text, raw
+from sanic.response import HTTPResponse, StreamingHTTPResponse, json, raw, stream, text
 
 from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
 from internals.spotify import should_inject_metadata
@@ -116,7 +116,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
             b"",
             status=206,
             headers={"Content-Range": f"bytes {start_read}-{start_read}/{content_length}"},
-            content_type="audio/ogg"
+            content_type="audio/ogg",
         )
 
     headers = {

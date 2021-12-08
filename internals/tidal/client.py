@@ -596,7 +596,7 @@ def inject_alac_or_aac_metadata(bita: bytes, track: TidalTrackStream):
 def should_inject_metadata(bita: bytes, track: TidalTrackStream):
     metadata = track.mimetype
     if "flac" in metadata:
-        _log.info(f"MetaInjectTest: Detected mimetype as FLAC, injecting metadata...")
+        _log.info("MetaInjectTest: Detected mimetype as FLAC, injecting metadata...")
         return inject_flac_metadata(bita, track), metadata, ".flac"
-    _log.info(f"MetaInjectTest: Defaulting to AAC/M4A/ALAC, injecting metadata...")
+    _log.info("MetaInjectTest: Defaulting to AAC/M4A/ALAC, injecting metadata...")
     return inject_alac_or_aac_metadata(bita, track), metadata, ".m4a"

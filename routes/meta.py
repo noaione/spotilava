@@ -16,11 +16,9 @@ async def get_meta_region_code(request: sanic.Request) -> HTTPResponse:
     Get the region code for the current user.
     """
     app: SpotilavaSanic = request.app
-    logger.info(
-        f"SpotiMeta: Received request to fetch country code of the account"
-    )
+    logger.info("SpotiMeta: Received request to fetch country code of the account")
     if not app.spotify:
-        logger.warning(f"SpotiMeta: Unable to fetch country code because Spotify is not ready yet!")
+        logger.warning("SpotiMeta: Unable to fetch country code because Spotify is not ready yet!")
         return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
 
     cc_code = app.spotify.session.country

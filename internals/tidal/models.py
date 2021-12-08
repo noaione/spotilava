@@ -33,38 +33,6 @@ class TidalUser:
         )
 
 
-"""
-{
-    'id': 202132352,
-    'title': 'Tides',
-    'duration': 196,
-    'replayGain': -11.14,
-    'peak': 1.0,
-    'allowStreaming': True,
-    'streamReady': True,
-    'streamStartDate': '2021-10-29T00:00:00.000+0000',
-    'premiumStreamingOnly': False,
-    'trackNumber': 1,
-    'volumeNumber': 1,
-    'version': None,
-    'popularity': 29,
-    'copyright': 'An Asylum Records UK release, a division of Atlantic Records UK, ℗ 2021 Warner Music UK Limited',
-    'url': 'http://www.tidal.com/track/202132352',
-    'isrc': 'GBAHS2100670',
-    'editable': False,
-    'explicit': False,
-    'audioQuality': 'HI_RES',
-    'audioModes': ['STEREO'],
-    'artist': {
-        'id': 3995478, 'name': 'Ed Sheeran', 'type': 'MAIN', 'picture': '05d72ae4-319f-4237-821f-1d7af9ec8acf'
-    },
-    'artists': [{'id': 3995478, 'name': 'Ed Sheeran', 'type': 'MAIN', 'picture': '05d72ae4-319f-4237-821f-1d7af9ec8acf'}],
-    'album': {'id': 202132351, 'title': '=', 'cover': 'e5f3f5bf-8c8f-4fe2-87fd-d7c73626da86', 'vibrantColor': '#ebc15f', 'videoCover': None},
-    'mixes': {'MASTER_TRACK_MIX': '014ffa548610ea8550fc0e8b6a5be3', 'TRACK_MIX': '001bb518e6d7c011773a045b2f1f21'}
-}
-"""
-
-
 @dataclass
 class TidalTrack:
     id: str

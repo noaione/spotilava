@@ -1,0 +1,21 @@
+{
+    "python.pythonPath": ".\\env\\Scripts\\python.exe",
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": [
+        "--config=.flake8"
+    ],
+    "[python]": {
+        "editor.formatOnSave": true,
+    },
+    "python.formatting.provider": "black",
+    "python.formatting.blackArgs": [
+        "-l",
+        "120",
+        "--target-version=py39",
+    ],
+    "python.analysis.diagnosticMode": "workspace",
+    "python.languageServer": "Pylance",
+    "autoDocstring.docstringFormat": "sphinx",
+    "python.linting.enabled": true,
+    "python.analysis.typeCheckingMode": "off"
+}
