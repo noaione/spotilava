@@ -2,10 +2,10 @@ import logging
 from io import BytesIO
 
 import sanic
+from sanic.response import HTTPResponse, StreamingHTTPResponse, json, stream, text
+
 from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
 from internals.tidal import should_inject_metadata
-from sanic.response import (HTTPResponse, StreamingHTTPResponse, json, stream,
-                            text)
 
 logger = logging.getLogger("Routes.Tidal.Tracks")
 
@@ -62,13 +62,13 @@ async def get_track_listen(request: sanic.Request, track_id: str):
     first_data: bytes = None
     if "flac" not in track.mimetype:
         # ALAC and Normal/Low hopefully are not memory consuming
-        logger.info(f"TrackListen: Detected as M4A/MP4/AAC/ALAC format!")
+        logger.info(f"TrackListen: Detected <{track_id}> as M4A/MP4/AAC/ALAC format!")
         read_whole = await track.read_all()
         read_whole, content_type, file_ext = should_inject_metadata(read_whole, track)
         complete_data = BytesIO(read_whole)
         complete_data.seek(0)
     else:
-        logger.info(f"TrackListen: Detected as FLAC format!")
+        logger.info(f"TrackListen: Detected <{track_id}> as FLAC format!")
         first_data = await track.read_bytes(CHUNK_SIZE)
         first_data, content_type, file_ext = should_inject_metadata(first_data, track)
 

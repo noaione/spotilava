@@ -34,16 +34,18 @@ from time import time as ctime
 from typing import List, Literal, Optional, Tuple
 
 import aiohttp
-from internals.errors import NoAudioFound, NoTrackFound
-from internals.utils import complex_walk
 from librespot.audio import CdnManager, NormalizationData, PlayableContentFeeder
 from librespot.audio.decoders import AudioQuality
 from librespot.core import ApResolver
 from librespot.core import Session as SpotifySession
 from librespot.metadata import EpisodeId, TrackId
+from librespot.proto import Authentication_pb2 as Authentication
 from librespot.proto import Metadata_pb2 as Metadata
 from mutagen.mp3 import MP3
 from mutagen.oggvorbis import OggVorbis
+
+from internals.errors import NoAudioFound, NoTrackFound
+from internals.utils import complex_walk
 
 from .models import *
 
@@ -72,12 +74,26 @@ class LIBRESpotifyTrack:
             self.loop = asyncio.get_event_loop()
 
     async def read_bytes(self, size: int) -> bytes:
+        if size <= 0:
+            return b""
         execute = self.loop.run_in_executor(
             None,
             self.input_stream.read,
             size,
         )
         return await execute
+
+    async def seek_to(self, location: int) -> None:
+        """
+        Skip to the given location.
+        """
+        await self.loop.run_in_executor(None, self.input_stream.seek, location)
+
+    async def close(self) -> None:
+        """
+        Close the track.
+        """
+        await self.loop.run_in_executor(None, self.input_stream.close)
 
 
 class SpotifySessionAsync(SpotifySession):
@@ -110,7 +126,31 @@ class SpotifySessionAsync(SpotifySession):
         """
         Reconnect to the server.
         """
-        await self._loop.run_in_executor(None, super().reconnect)
+        if self.connection is not None:
+            self.logger.info("SpotifyReconnect: Closing existing connection...")
+            await self._loop.run_in_executor(None, self.connection.close)
+            self.__receiver.stop()
+
+        self.logger.info("SpotifyReconnect: Fetching random access point")
+        ap_endpoint = await self._loop.run_in_executor(None, ApResolver.get_random_accesspoint)
+        self.logger.info("SpotifyReconnect: Creating connection socket...")
+        self.connection = await self._loop.run_in_executor(
+            None, SpotifySession.ConnectionHolder.create, ap_endpoint, self.__inner.conf
+        )
+        self.logger.info("SpotifyReconnect: Connecting to Spotify...")
+        await self._loop.run_in_executor(None, self.connect)
+        self.logger.info("SpotifyReconnect: Connected to Spotify, authenticating...")
+        log_credentials = Authentication.LoginCredentials(
+            typ=self.__ap_welcome.reusable_auth_credentials_type,
+            username=self.__ap_welcome.canonical_username,
+            auth_data=self.__ap_welcome.reusable_auth_credentials,
+        )
+        await self._loop.run_in_executor(None, self.__authenticate_partial, log_credentials)
+        try:
+            canon_username = self.__ap_welcome.canonical_username
+            self.logger.info(f"SpotifyReconnect: Authenticated! Now connecting as {canon_username}!")
+        except Exception:
+            self.logger.info("SpotifyReconnect: Reauthenticated!")
 
     def _reconnect_done(self):
         self.logger.info("Connection reestablished again, removing task...")
@@ -185,7 +225,7 @@ class LIBRESpotifyWrapper:
         await self._loop.run_in_executor(None, session.connect)
         self.logger.info("Spotify: Connected, authenticating...")
         await self._loop.run_in_executor(None, session.authenticate, self.builder.login_credentials)
-        self.logger.info(f"Spotify: Authenticated")
+        self.logger.info("Spotify: Authenticated")
         self.session = session
 
     async def get_track(self, track_id: str):
@@ -493,7 +533,7 @@ def test_mp3_meta(bita: bytes):
         MP3(io_bita)
         return True
     except Exception:
-        _log.warning(f"Unable to find MP3 header")
+        _log.warning("Unable to find MP3 header")
         return False
 
 
@@ -534,20 +574,20 @@ FileContentExt = Literal[".ogg", ".mp3", ".m4a"]
 
 
 def should_inject_metadata(bita: bytes, track: LIBRESpotifyTrack) -> Tuple[bytes, FileContentType, FileContentExt]:
-    _log.info(f"MetaInjectTest: Checking bytes header for OggS...")
+    _log.info("MetaInjectTest: Checking bytes header for OggS...")
     ogg_bita = bita[:4]
     if ogg_bita == b"OggS":
-        _log.info(f"MetaInjectTest: Found OggS header, injecting metadata...")
+        _log.info("MetaInjectTest: Found OggS header, injecting metadata...")
         return inject_ogg_metadata(bita, track), "audio/ogg", ".ogg"
-    _log.info(f"MetaInjectTest: No OggS header found, trying to check ID3 meta...")
+    _log.info("MetaInjectTest: No OggS header found, trying to check ID3 meta...")
     id3_bita = bita[:3]
     if id3_bita == b"ID3":
-        _log.info(f"MetaInjectTest: Found ID3 header, returning immediatly...")
+        _log.info("MetaInjectTest: Found ID3 header, returning immediatly...")
         return bita, "audio/mpeg", ".mp3"
-    _log.info(f"MetaInjectTest: No ID3 header found, trying to find MP3 header...")
+    _log.info("MetaInjectTest: No ID3 header found, trying to find MP3 header...")
     is_mp3 = test_mp3_meta(bita)
     if is_mp3:
-        _log.info(f"MetaInjectTest: Found MP3 header, injecting metadata...")
+        _log.info("MetaInjectTest: Found MP3 header, injecting metadata...")
         return inject_mp3_metadata(bita, track), "audio/mpeg", ".mp3"
-    _log.info(f"MetaInjectTest: No match for metadata, returning immediatly with ogg meta...")
+    _log.info("MetaInjectTest: No match for metadata, returning immediatly with ogg meta...")
     return bita, "audio/ogg", ".ogg"

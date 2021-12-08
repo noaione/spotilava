@@ -27,26 +27,69 @@ This implements the rest of AAC and MP3 encoding quality.
 from __future__ import annotations
 
 import logging
+from enum import Enum
 from typing import Any, List, Optional
 
 from librespot.audio import SuperAudioFormat
-from librespot.audio.decoders import AudioQuality
 from librespot.proto import Metadata_pb2 as Metadata
 from librespot.structure import AudioQualityPicker
 
 __all__ = ("AutoFallbackAudioQuality",)
 
 
+class AudioQualityPatched(Enum):
+    NORMAL = 0x00
+    HIGH = 0x01
+    VERY_HIGH = 0x02
+
+    @staticmethod
+    def get_quality(audio_format: Metadata.AudioFile.Format) -> AudioQualityPatched:
+        if audio_format in [
+            Metadata.AudioFile.MP3_96,
+            Metadata.AudioFile.OGG_VORBIS_96,
+            Metadata.AudioFile.AAC_24_NORM,
+        ]:
+            return AudioQualityPatched.NORMAL
+        if audio_format in [
+            Metadata.AudioFile.MP3_160,
+            Metadata.AudioFile.MP3_160_ENC,
+            Metadata.AudioFile.OGG_VORBIS_160,
+            Metadata.AudioFile.AAC_24,
+        ]:
+            return AudioQualityPatched.HIGH
+        if audio_format in [
+            Metadata.AudioFile.MP3_320,
+            Metadata.AudioFile.MP3_256,
+            Metadata.AudioFile.OGG_VORBIS_320,
+            Metadata.AudioFile.AAC_48,
+        ]:
+            return AudioQualityPatched.VERY_HIGH
+        raise RuntimeError(f"Unknown format: {audio_format}")
+
+    @classmethod
+    def from_super(cls, super_audio: AudioQualityPatched) -> AudioQualityPatched:
+        return cls(super_audio.value)
+
+    def get_matches(self, files: List[Metadata.AudioFile]) -> List[Metadata.AudioFile]:
+        file_lists = []
+        for file in files:
+            if hasattr(file, "format") and AudioQualityPatched.get_quality(file.format) == self:
+                file_lists.append(file)
+        return file_lists
+
+
 class AutoFallbackAudioQuality(AudioQualityPicker):
     logger = logging.getLogger("Spotilava:Player:AutoFallbackAudioQuality")
-    preferred: AudioQuality
+    preferred: AudioQualityPatched
 
-    def __init__(self, preferred: AudioQuality) -> None:
-        self.preferred: AudioQuality = preferred
-        self.other_quality: List[AudioQuality] = [
-            AudioQuality.VERY_HIGH,
-            AudioQuality.HIGH,
-            AudioQuality.NORMAL,
+    def __init__(self, preferred: AudioQualityPatched) -> None:
+        self.preferred: AudioQualityPatched = preferred
+        if not isinstance(preferred, AudioQualityPatched):
+            self.preferred: AudioQualityPatched = AudioQualityPatched.from_super(preferred)
+        self.other_quality: List[AudioQualityPatched] = [
+            AudioQualityPatched.VERY_HIGH,
+            AudioQualityPatched.HIGH,
+            AudioQualityPatched.NORMAL,
         ]
         self.other_quality.remove(self.preferred)
 
@@ -58,7 +101,7 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
                 valid_files.append(file)
         return valid_files
 
-    def get_audio(self, files: List[Metadata.AudioFile], preferred: AudioQuality) -> Metadata.AudioFile:
+    def get_audio(self, files: List[Metadata.AudioFile], preferred: AudioQualityPatched) -> Metadata.AudioFile:
         if not files:
             return None
         matches = preferred.get_matches(files)
