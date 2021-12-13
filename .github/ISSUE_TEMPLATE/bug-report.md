@@ -9,6 +9,8 @@ assignees: noaione
 
 <!--
      Please make sure your problem is not something in the Known Issues in the README
+
+     You can also select extra labels for the specific module that is not working on the right side.
 -->
 
 **Describe the bug**
