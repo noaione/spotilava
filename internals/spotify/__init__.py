@@ -1,6 +1,6 @@
 """
-internals.tidal
-~~~~~~~~~~~~~~~~~
+internals.spotify
+~~~~~~~~~~~~~~~~~~
 The handler for Spotify and librespot stuff.
 
 :copyright: (c) 2021-present noaione
