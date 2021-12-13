@@ -84,7 +84,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
                 await response.write(data)
 
     headers = {
-        "Content-Disposition": f'inline; filename="track_{track_id}{file_ext}"',
+        "Content-Disposition": f'inline; filename="track_tidal_{track_id}{file_ext}"',
     }
     if complete_data is not None:
         headers["Content-Length"] = len(complete_data.getvalue())
