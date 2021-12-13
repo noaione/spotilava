@@ -66,7 +66,7 @@ This might not be possible without this following repository and wiki:
 
 ## Deezer
 
-[Deezer](https://tidal.com/) is a French based online music streaming service developed by Access Industries, Inc. They mostly provide music content from multiple record labels at much higher quality than Spotify.
+[Deezer](https://deezer.com/) is a French based online music streaming service developed by Access Industries, Inc. They mostly provide music content from multiple record labels at much higher quality than Spotify.
 
 **NOTE**: Current implementation is broken, audio is stuttering badly with free account.
 
