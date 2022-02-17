@@ -20,6 +20,7 @@ I would recommend a burner premium account.
   - It will also take account the audio quality. (`VERY_HIGH` > `HIGH` > `NORMAL`)
 - [x] Automatic metadata injection if needed w/ mutagen (so Lavalink/Lavaplayer parse it properly.)
 - [x] Asynchronous from the start (Powered with [Sanic](https://sanicframework.org/))
+- [x] Support fetching Spotify lyrics (which powered by Musixmatch)
 
 ## Requirements
 
@@ -58,6 +59,7 @@ In `.env.example` you will find 3 options:
 
 - `/:track_id` get the metadata of the track ID. (JSON)
 - `/:track_id/listen` get the track itself, returns the OGG Vorbis or MP3 stream. (Binary)
+- `/:track_id/lyrics` get the track lyrics (if available) (JSON)
 - `/album/:album_id/` get the list of Album data. (JSON)
 - `/playlist/:playlist_id` get the list of playlist data. (JSON)
 - `/show/:show_id/` get the list of Show/Podcast data. (JSON)

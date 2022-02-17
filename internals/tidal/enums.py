@@ -7,7 +7,7 @@ __all__ = ("TidalAudioQuality",)
 
 class TidalAudioQuality(Enum):
     low = "LOW"
-    normal = "NORMAL"
+    high = "HIGH"
     lossless = "LOSSLESS"
     master = "HI_RES"
 
@@ -24,7 +24,7 @@ class TidalAudioQuality(Enum):
         return int(self) >= int(other)
 
     def __int__(self):
-        mapping = {"low": 0, "normal": 1, "lossless": 2, "master": 3}
+        mapping = {"low": 0, "high": 1, "lossless": 2, "master": 3}
         return mapping.get(self.name, -1)
 
     def __str__(self):

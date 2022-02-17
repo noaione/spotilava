@@ -60,7 +60,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
     # HACK: CHeck if it's not FLAC, after that download all chunks
     complete_data: BytesIO = None
     first_data: bytes = None
-    if "flac" not in track.mimetype:
+    if "flac" not in track.streamer.mimetype:
         # ALAC and Normal/Low hopefully are not memory consuming
         logger.info(f"TrackListen: Detected <{track_id}> as M4A/MP4/AAC/ALAC format!")
         read_whole = await track.read_all()
@@ -83,15 +83,15 @@ async def get_track_listen(request: sanic.Request, track_id: str):
                 data = await track.read_bytes(CHUNK_SIZE)
                 await response.write(data)
 
-    if complete_data is not None:
-        content_length = len(complete_data.read())
-    else:
-        content_length = len(first_data) + track.available()
-
     headers = {
-        "Content-Length": str(content_length),
         "Content-Disposition": f'inline; filename="track_{track_id}{file_ext}"',
     }
+    if complete_data is not None:
+        headers["Content-Length"] = len(complete_data.getvalue())
+    else:
+        available = track.available()
+        if available != -1:
+            headers["Content-Type"] = len(first_data) + available
 
     logger.info(f"TrackListen: Sending track <{track_id}>")
     # OGG vorbis stream

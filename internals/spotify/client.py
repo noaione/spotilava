@@ -32,6 +32,7 @@ from io import BytesIO
 from pathlib import Path
 from time import time as ctime
 from typing import List, Literal, Optional, Tuple
+from urllib.parse import quote_plus as url_quote
 
 import aiohttp
 from librespot.audio import CdnManager, NormalizationData, PlayableContentFeeder
@@ -347,6 +348,77 @@ class LIBRESpotifyWrapper:
         if data:
             return SpotifyTrack.from_track(data)
         return None
+
+    async def get_base_url(self, service_type: str):
+        svc_url = await self._loop.run_in_executor(None, ApResolver.get_random_of, service_type)
+        return f"https://{svc_url}"
+
+    def _build_url(self, base_url: str, everything_else: str):
+        if base_url.endswith("/"):
+            if everything_else.startswith("/"):
+                return f"{base_url[:-1]}{everything_else}"
+            return f"{base_url}{everything_else}"
+        if everything_else.startswith("/"):
+            return f"{base_url}{everything_else}"
+        return f"{base_url}/{everything_else}"
+
+    async def get_track_lyric(self, track_id: str) -> Optional[List[str]]:
+        track_info = await self.get_track_metadata(track_id)
+        if track_info is None:
+            return None
+        image_url = url_quote(track_info.image)
+        token = await self._get_token()
+
+        request_url = f"https://spclient.wg.spotify.com/color-lyrics/v2/track/{track_id}/image/{image_url}"
+        header_token = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json",
+            "app-platform": "WebPlayer",
+            "spotify-app-version": "1.1.80.311.g7431ec90",
+        }
+
+        async with aiohttp.ClientSession(headers=header_token) as client:
+            self.logger.info(f"Spotify: Requesting lyric for <{track_id}>")
+            async with client.get(
+                request_url, params={"format": "json", "vocalRemoval": "false", "market": "from_token"}
+            ) as resp:
+                if resp.status != 200:
+                    self.logger.warning(
+                        f"Spotify: Failed to fetch lyric for <{track_id}> ({resp.status} {resp.reason})"
+                    )
+                    return None
+                lyrics_data = await resp.json()
+
+        # Arrange lyrics
+        lyrics = lyrics_data.get("lyrics", {}).get("lines", [])
+        if not lyrics:
+            self.logger.warning(f"Spotify: No lyrics found for <{track_id}>")
+            return None
+
+        actual_lines: List[str] = []
+        for line in lyrics:
+            if line["words"] == "♪" and not line.get("syllables"):
+                actual_lines.append("[Instrumental]")
+                continue
+            if line["words"] == "":
+                actual_lines.append("\n")
+                continue
+            actual_lines.append(line["words"])
+
+        last_one = actual_lines[-1]
+        if last_one == "\n":
+            actual_lines.pop()
+
+        # Make sure no inst dupes
+        copy_of_actual_lines: List[str] = []
+        last_one = None
+        for line in actual_lines:
+            if last_one is not None:
+                if last_one == "[Instrumental]" and line == "[Instrumental]":
+                    continue
+            last_one = line
+            copy_of_actual_lines.append(line)
+        return copy_of_actual_lines
 
     async def get_album(self, album_id: str) -> Optional[SpotifyAlbum]:
         token = await self._get_token()

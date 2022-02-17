@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Union
 
 import aiohttp
 import orjson
@@ -42,6 +42,8 @@ from mutagen.mp4 import MP4 as ALAC
 
 from .enums import TidalAudioQuality
 from .models import TidalAlbum, TidalPlaylist, TidalTrack, TidalUser
+from .mpd import TidalMPDMeta, parse_mpd_string
+from .stream import TidalBTS, TidalMPD
 
 if TYPE_CHECKING:
     from Crypto.Cipher._mode_ctr import CtrMode
@@ -58,81 +60,51 @@ class TidalConfig:
         import random
 
         cc_s = [
-            122,
-            120,
-            101,
-            110,
-            49,
-            114,
-            51,
-            112,
-            79,
-            48,
-            104,
-            103,
-            116,
-            79,
-            67,
-            55,
-            106,
-            54,
-            116,
-            119,
-            77,
-            111,
-            57,
-            85,
-            65,
-            113,
-            110,
-            103,
-            71,
-            114,
-            109,
-            82,
-            105,
-            87,
-            112,
             86,
-            55,
-            81,
-            67,
-            49,
-            122,
             74,
-            56,
-        ]
-        cc_id = [
-            79,
-            109,
+            75,
+            104,
             68,
-            116,
-            114,
-            122,
             70,
-            103,
-            121,
+            113,
+            74,
+            80,
+            113,
+            118,
+            115,
+            80,
             86,
+            78,
+            66,
             86,
-            76,
             54,
             117,
-            87,
-            53,
-            54,
-            79,
-            110,
-            70,
-            65,
-            50,
-            67,
-            79,
-            105,
-            97,
-            98,
-            113,
+            107,
+            88,
+            84,
+            74,
             109,
+            119,
+            108,
+            118,
+            98,
+            116,
+            116,
+            80,
+            55,
+            119,
+            108,
+            77,
+            108,
+            114,
+            99,
+            55,
+            50,
+            115,
+            101,
+            52,
         ]
+        cc_id = [122, 85, 52, 88, 72, 86, 86, 107, 99, 50, 116, 68, 80, 111, 52, 116]
         i = random.randint(0, len(cc_s) - 1)
         for _ in range(i):
             cc_s.reverse()
@@ -199,41 +171,42 @@ class TidalTrackDecryptor:
 @dataclass
 class TidalTrackStream:
     track: TidalTrack
-    mimetype: str
-    url: str
+    streamer: Union[TidalBTS, TidalMPD]
     decryptor: TidalTrackDecryptor
-    session: aiohttp.ClientSession
-    request: aiohttp.ClientResponse = None
-    read: int = 0
+    is_mpd: bool = False
+
+    def __post_init__(self):
+        if isinstance(self.streamer, TidalMPD):
+            self.is_mpd = True
 
     async def init(self):
-        self.request = await self.session.get(self.url)
-        self.read = 0
+        await self.streamer.init()
 
     def empty(self):
-        return self.request.content.at_eof()
+        return self.streamer.empty()
 
-    def available(self) -> int:
-        content_length = self.request.content_length
-        return content_length - self.read
+    def available(self):
+        if isinstance(self.streamer, TidalMPD):
+            # TODO: figure out how to check total MPD length
+            return -1
+        return self.streamer.available()
 
     async def read_bytes(self, size: int = 4096):
-        streamer = self.request.content
         if self.empty():
-            self.request.close()
+            await self.streamer.close()
             return b""
 
-        data = await streamer.read(size)
-        self.read += len(data)
-        if self.empty():
-            self.request.close()
+        data = await self.streamer.read_bytes(size)
         return await self.decryptor.decrypt(data)
 
     async def read_all(self):
-        data = await self.request.read()
-        self.read += len(data)
-        self.request.close()
+        data = await self.streamer.read_all()
+        await self.streamer.close()
         return await self.decryptor.decrypt(data)
+
+    async def as_chunks(self, read_every: bytes):
+        async for chunks in self.streamer.as_chunks(read_every):
+            yield await self.decryptor.decrypt(chunks)
 
 
 class TidalAPI:
@@ -427,13 +400,15 @@ class TidalAPI:
 
         return TidalTrack.from_track(track_info)
 
-    async def _get_stream_info(self, track: TidalTrack, want: str = "OFFLINE"):
+    async def _get_stream_info(self, track: TidalTrack, want: str = "OFFLINE", override: str = None):
         url_path = self.PATH + f"/tracks/{track.id}/playbackinfopostpaywall"
         params = {
             "audioquality": track.audio_quality.value,
             "playbackmode": want,
             "assetpresentation": "FULL",
         }
+        if override is not None:
+            params["audioquality"] = override
         self.logger.info(f"TidalTrack: Fetching {want} URL information for <{track.id}>")
         stream_info = await self._get(url_path, params)
         return stream_info
@@ -445,9 +420,9 @@ class TidalAPI:
             self.logger.error(f"Tidal: Unable to find specified track <{track_id}>!")
             return None
 
-        stream_info = await self._get_stream_info(track_info)
+        stream_info = await self._get_stream_info(track_info, override="HIGH")
         if stream_info is None:
-            stream_info = await self._get_stream_info(track_info, "STREAM")
+            stream_info = await self._get_stream_info(track_info, "STREAM", "HIGH")
             if stream_info is None:
                 self.logger.error(f"Tidal: Unable to find any stream URL for track <{track_id}>!")
                 return None
@@ -478,23 +453,39 @@ class TidalAPI:
                         )
 
         mf_type = stream_info["manifestMimeType"]
-        if "vnd.tidal.bts" not in mf_type:
+        manifest = None
+        if "vnd.tidal.bts" in mf_type:
+            self.logger.info(f"TidalTrack: Detected manifest type for <{track_id}> ({mf_type})")
+            manifest = orjson.loads(b64decode(stream_info["manifest"]))
+        elif "dash+xml" in mf_type:
+            self.logger.info(f"TidalTrack: Detected manifest type for <{track_id}> ({mf_type})")
+            manifest = parse_mpd_string(b64decode(stream_info["manifest"]).decode("utf-8"))
+        else:
             self.logger.error(f"TidalTrack: Unknown manifest type for <{track_id}> ({mf_type})")
             return None
 
-        manifest = orjson.loads(b64decode(stream_info["manifest"]))
+        if manifest is None:
+            self.logger.error(f"TidalTrack: Unable to parse manifest for <{track_id}>")
+            return None
 
         tidal_key = None
-        if "keyId" in manifest:
+        if not isinstance(manifest, TidalMPDMeta) and "keyId" in manifest:
             tidal_key = manifest["keyId"]
+
+        tidal_streamer = None
+        if isinstance(manifest, TidalMPDMeta):
+            tidal_streamer = TidalMPD(manifest, session=self.session, loop=self._loop)
+        else:
+            codecs = manifest.get("codecs", "unknown")
+            mimetype = manifest.get("mimeType", "unknown")
+            url = manifest["urls"][0]
+            tidal_streamer = TidalBTS(codecs, mimetype, url, session=self.session, loop=self._loop)
 
         decryption = TidalTrackDecryptor(tidal_key, loop=self._loop)
         track_stream = TidalTrackStream(
             track=track_info,
-            mimetype=manifest["mimeType"],
-            url=manifest["urls"][0],
+            streamer=tidal_streamer,
             decryptor=decryption,
-            session=self.session,
         )
         self.logger.info(f"TidalTrack: Fetched track <{track_id}>, now fetching stream...")
         await track_stream.init()
@@ -567,14 +558,14 @@ def inject_flac_metadata(bita: bytes, track: TidalTrackStream):
     return io_bita.read()
 
 
-def inject_alac_or_aac_metadata(bita: bytes, track: TidalTrackStream):
-    _log.debug(f"AacInject: Trying to inject metadata for track <{track.track.id}>")
+def inject_mpX_metadata(bita: bytes, track: TidalTrackStream):
+    _log.debug(f"MPXInject: Trying to inject metadata for track <{track.track.id}>")
     io_bita = BytesIO(bita)
     io_bita.seek(0)
     try:
         aac_metadata = ALAC(io_bita)
     except Exception as e:
-        _log.error(f"AacInject: Unable to open track <{track.track.id}>", exc_info=e)
+        _log.error(f"MPXInject: Unable to open track <{track.track.id}>", exc_info=e)
         return bita
 
     track_meta = track.track
@@ -587,16 +578,25 @@ def inject_alac_or_aac_metadata(bita: bytes, track: TidalTrackStream):
     try:
         aac_metadata.save(io_bita)
     except Exception as e:
-        _log.error(f"AacInject: Unable to save track <{track.track.id}>", exc_info=e)
+        _log.error(f"MPXInject: Unable to save track <{track.track.id}>", exc_info=e)
         return bita
     io_bita.seek(0)
     return io_bita.read()
 
 
+map_codecs = {
+    "eac3": ".eac3",
+    "ac3": ".ac3",
+    "alac": ".alac",
+    "ac4": ".ac4",
+    "mha1": ".mp4",
+}
+
+
 def should_inject_metadata(bita: bytes, track: TidalTrackStream):
-    metadata = track.mimetype
+    metadata = track.streamer.mimetype
     if "flac" in metadata:
         _log.info("MetaInjectTest: Detected mimetype as FLAC, injecting metadata...")
         return inject_flac_metadata(bita, track), metadata, ".flac"
     _log.info("MetaInjectTest: Defaulting to AAC/M4A/ALAC, injecting metadata...")
-    return inject_alac_or_aac_metadata(bita, track), metadata, ".m4a"
+    return inject_mpX_metadata(bita, track), metadata, map_codecs.get(track.streamer.codecs, ".m4a")

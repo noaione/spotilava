@@ -162,3 +162,31 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         content_type=content_type,
         headers=headers,
     )
+
+
+@tracks_bp.get("/<track_id>/lyrics")
+async def get_track_lyrics(request: sanic.Request, track_id: str) -> HTTPResponse:
+    app: SpotilavaSanic = request.app
+    logger.info(f"TrackLyrics: Received request for track <{track_id}>")
+    if not app.spotify:
+        logger.warning(f"TrackLyrics: Unable to fetch <{track_id}> because Spotify is not ready yet!")
+        return json({"error": "Spotify not connected.", "code": 500, "data": None}, status=500)
+    if len(track_id) != 22:
+        logger.warning(f"TrackLyrics: Track <{track_id}> is invalid, expected 22 length, got {len(track_id)} instead")
+        return json(
+            {
+                "error": f"Invalid track id, expected 22 char length, got {len(track_id)} instead",
+                "code": 400,
+                "data": None,
+            },
+            status=500,
+        )
+    if not track_id.isalnum():
+        logger.warning(f"TrackLyrics: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead")
+        return json({"error": "Invalid track id, must be alphanumerical", "code": 400, "data": None}, status=500)
+
+    lyrics_info = await app.spotify.get_track_lyric(track_id)
+    if lyrics_info is None:
+        logger.warning(f"TrackLyrics: Unable to fetch lyrics for track <{track_id}>")
+        return json({"error": "Unable to fetch lyrics", "code": 500, "data": None}, status=500)
+    return json({"error": "Success", "code": 200, "data": lyrics_info}, ensure_ascii=False)
