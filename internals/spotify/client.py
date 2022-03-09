@@ -107,6 +107,12 @@ class SpotifySessionAsync(SpotifySession):
         self._loop = loop or asyncio.get_event_loop()
 
         self._actual_reconnect_task: Optional[asyncio.Task] = None
+        self._is_reconnection_ready: asyncio.Event = asyncio.Event()
+        # Mark as set from the start
+        self._is_reconnection_ready.set()
+
+    async def wait_reconnect(self):
+        await self._is_reconnection_ready.wait()
 
     @property
     def country(self) -> Optional[str]:
@@ -155,6 +161,7 @@ class SpotifySessionAsync(SpotifySession):
 
     def _reconnect_done(self):
         self.logger.info("Connection reestablished again, removing task...")
+        self._is_reconnection_ready.set()
         if self._actual_reconnect_task:
             self._actual_reconnect_task = None
 
@@ -171,6 +178,7 @@ class SpotifySessionAsync(SpotifySession):
         Reconnect to the Spotify API.
         This will actuall do schedule with loop.call_soon_threadsafe.
         """
+        self._is_reconnection_ready.clear()
         self.logger.info("Reconnecting to Spotify API with task...")
         dt = int(ctime())
         task = self._loop.create_task(self._reconnect(), name=f"librespot-reconnect-{dt}")
@@ -202,6 +210,7 @@ class LIBRESpotifyWrapper:
 
         self.builder = builder
         self.session: SpotifySessionAsync = None
+        self._reconnect_dispatch = asyncio.Event()
 
     def clsoe(self):
         self.logger.info("Spotify: Closing session")
@@ -308,11 +317,30 @@ class LIBRESpotifyWrapper:
             is_track=False,
         )
 
+    async def _force_reconnect(self):
+        if self._reconnect_dispatch.is_set():
+            await self._reconnect_dispatch.wait()
+            return
+        self.logger.info("Spotify: Force reconnecting Spotilava with Spotify (this will block everything)...")
+        self.session.reconnect()
+        self._reconnect_dispatch.clear()
+        await self.session.wait_reconnect()
+        self._reconnect_dispatch.set()
+
     async def _get_token(self):
         self.logger.info("Spotify: Fetching token provider")
-        token_provider = await self._loop.run_in_executor(None, self.session.tokens)
+        try:
+            token_provider = await self._loop.run_in_executor(None, self.session.tokens)
+        except BrokenPipeError:
+            self.logger.warning("Spotify: The pipe to API is broken, reconnecting...")
+            await self._force_reconnect()
+
         self.logger.info("Spotify: Fetching token for playlist-read")
-        token = await self._loop.run_in_executor(None, token_provider.get_token, "playlist-read")
+        try:
+            token = await self._loop.run_in_executor(None, token_provider.get_token, "playlist-read")
+        except BrokenPipeError:
+            self.logger.warning("Spotify: The pipe to API is broken, reconnecting...")
+            await self._force_reconnect()
         return token.access_token
 
     async def _fetch_all_tracks(self, next: str, token: str):
