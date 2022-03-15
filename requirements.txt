@@ -5,7 +5,7 @@ mutagen==1.45.1
 aiohttp==3.8.1
 
 # Spotify specific requirements
--e git+https://github.com/kokarare1212/librespot-python.git@49b3803ee696f41dd6eb9b757354227e1b74f8ec#egg=librespot
+-e git+https://github.com/kokarare1212/librespot-python.git@0cee35a3ac23dddd8e2c10f781a3db010d533778#egg=librespot
 
 # Tidal specific requirements
 pycryptodome==3.11.0
