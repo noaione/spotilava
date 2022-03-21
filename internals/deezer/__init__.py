@@ -1,7 +1,7 @@
 """
-internals.spotify
-~~~~~~~~~~~~~~~~~~
-The handler for Spotify and librespot stuff.
+internals.deezer
+~~~~~~~~~~~~~~~~~
+The handler for Deezer
 
 :copyright: (c) 2021-present noaione
 :license: MIT, see LICENSE for more details.
@@ -11,4 +11,3 @@ The handler for Spotify and librespot stuff.
 
 from .client import *
 from .models import *
-from .tracks import *

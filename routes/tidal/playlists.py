@@ -36,7 +36,7 @@ async def get_album_contents(request: sanic.Request, album_id: str) -> HTTPRespo
 @tidal_playlists_bp.get("/playlist/<playlist_id>")
 async def get_playlist_contents(request: sanic.Request, playlist_id: str) -> HTTPResponse:
     app: SpotilavaSanic = request.app
-    logger.info(f"PlaylistContents: Received request for album <{playlist_id}>")
+    logger.info(f"PlaylistContents: Received request for playlist <{playlist_id}>")
     if not app.tidal:
         logger.warning(f"PlaylistContents: Unable to fetch <{playlist_id}> because Tidal is not ready yet!")
         return json({"error": "Tidal not connected.", "code": 500, "data": None}, status=500)
@@ -46,8 +46,8 @@ async def get_playlist_contents(request: sanic.Request, playlist_id: str) -> HTT
 
     playlist_info = await app.tidal.get_playlists(playlist_id)
     if playlist_info is None:
-        logger.warning(f"PlaylistContents: Unable to find album <{playlist_id}>")
-        return json({"error": "Album not found.", "code": 404, "data": None}, status=404)
+        logger.warning(f"PlaylistContents: Unable to find playlist <{playlist_id}>")
+        return json({"error": "Playlist not found.", "code": 404, "data": None}, status=404)
 
     playlist_meta = playlist_info.to_json()
     return json({"error": "Success", "code": 200, "data": playlist_meta})

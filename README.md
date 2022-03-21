@@ -77,7 +77,7 @@ It will use your account country as what the top tracks are for the artist in th
 
 ## Extensions
 
-Spotilava includes some extension that support other premium music provider like Tidal, learn more [here](EXTENSIONS.md).
+Spotilava includes some extension that support other premium music provider like Tidal and more, learn more [here](EXTENSIONS.md).
 
 ## How it works?
 

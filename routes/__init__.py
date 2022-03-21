@@ -9,6 +9,7 @@ The routes collection for Spotilava
 
 # flake8: noqa
 
+from .deezer import *
 from .episodes import episodes_bp
 from .meta import meta_bp
 from .playlists import playlists_bp

@@ -1,7 +1,7 @@
 """
 routes.tidal
 ~~~~~~~~~~~~~
-The routes collection for Spotilava tidal extension
+The routes collection for Spotilava Tidal extension
 
 :copyright: (c) 2021-present noaione
 :license: MIT, see LICENSE for more details.

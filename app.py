@@ -9,12 +9,22 @@ import sanic
 from dotenv import load_dotenv
 from sanic.response import HTTPResponse, file, text
 
+from internals.deezer import DeezerClient
 from internals.logger import RollingFileHandler
 from internals.monke import monkeypatch_load
 from internals.sanic import SpotilavaSanic
 from internals.spotify import LIBRESpotifyWrapper
 from internals.tidal import TidalAPI
-from routes import episodes_bp, meta_bp, playlists_bp, tidal_playlists_bp, tidal_tracks_bp, tracks_bp
+from routes import (
+    deezer_playlists_bp,
+    deezer_tracks_bp,
+    episodes_bp,
+    meta_bp,
+    playlists_bp,
+    tidal_playlists_bp,
+    tidal_tracks_bp,
+    tracks_bp,
+)
 
 # Monkeypatch librespot
 monkeypatch_load()
@@ -77,6 +87,28 @@ async def connect_tidal(app: SpotilavaSanic):
     app.tidal = tidal
 
 
+async def connect_deezer(app: SpotilavaSanic):
+    if app.deezer is not None:
+        return
+
+    if os.getenv("ENABLE_DEEZER", "0") != "1":
+        logger.info("App: Deezer is disabled.")
+        return
+    logger.info("App: Creating Deezer wrapper...")
+    deezer_arl = os.getenv("DEEZER_ARL", "").strip()
+    if deezer_arl == "":
+        logger.error("App: Deezer is enabled but DEEZER_ARL is not set.")
+        sys.exit(69)
+
+    deezer = DeezerClient(deezer_arl, loop=app.loop)
+    try:
+        await deezer.create()
+    except Exception as e:
+        logger.error(f"App: Failed to create deezer wrapper: {e}", exc_info=e)
+        sys.exit(69)
+    app.deezer = deezer
+
+
 logger.info("App: Initiating spotilava webserver...")
 loop = asyncio.get_event_loop()
 app = SpotilavaSanic("Spotilava")
@@ -93,6 +125,7 @@ else:
 
 app.add_task(connect_spotify)
 app.add_task(connect_tidal)
+app.add_task(connect_deezer)
 
 # For metadata tagging purpose
 if CHUNK_SIZE < 4096:
@@ -123,6 +156,11 @@ if os.getenv("ENABLE_TIDAL", "0") == "1":
     app.blueprint(tidal_tracks_bp)
     app.blueprint(tidal_playlists_bp)
 
+# Deezer extension
+if os.getenv("ENABLE_DEEZER", "0") == "1":
+    app.blueprint(deezer_tracks_bp)
+    app.blueprint(deezer_playlists_bp)
+
 
 if __name__ == "__main__":
     try:
@@ -132,4 +170,6 @@ if __name__ == "__main__":
         app.spotify.clsoe()
         if app.tidal:
             app.loop.run_until_complete(app.tidal.close())
+        if app.deezer:
+            app.loop.run_until_complete(app.deezer.close())
         app.stop()
