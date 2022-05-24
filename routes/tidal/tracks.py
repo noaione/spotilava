@@ -2,14 +2,14 @@ import logging
 from io import BytesIO
 
 import sanic
-from sanic.response import HTTPResponse, StreamingHTTPResponse, json, stream, text
+from sanic.response import HTTPResponse, ResponseStream, json, stream, text
 
 from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
 from internals.tidal import should_inject_metadata
 
 logger = logging.getLogger("Routes.Tidal.Tracks")
 
-tidal_tracks_bp = SpotilavaBlueprint("tidal:tracks", url_prefix="/tidal/")
+tidal_tracks_bp = SpotilavaBlueprint("tidal-tracks", url_prefix="/tidal/")
 
 
 @tidal_tracks_bp.get("/<track_id>")
@@ -73,7 +73,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         first_data, content_type, file_ext = should_inject_metadata(first_data, track)
 
     # Streaming function
-    async def track_stream(response: StreamingHTTPResponse):
+    async def track_stream(response: ResponseStream):
         if complete_data is not None:
             complete_data.seek(0)
             await response.write(complete_data.read())

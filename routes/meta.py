@@ -7,7 +7,7 @@ from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
 
 logger = logging.getLogger("Spotify.Meta")
 
-meta_bp = SpotilavaBlueprint("spotify:meta", url_prefix="/meta")
+meta_bp = SpotilavaBlueprint("spotify-meta", url_prefix="/meta")
 
 
 @meta_bp.get("/region")
