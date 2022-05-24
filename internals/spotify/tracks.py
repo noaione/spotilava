@@ -142,7 +142,7 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
     def get_as_string(self, files: List[Metadata.AudioFile]) -> List[str]:
         collected_valid_audio: List[Optional[Metadata.AudioFile]] = []
         vorbis_files = AutoFallbackAudioQuality.get_all_files(files, SuperAudioFormat.VORBIS)
-        # aac_files = []
+        aac_files = AutoFallbackAudioQuality.get_all_files(files, SuperAudioFormat.AAC)
         mp3_files = AutoFallbackAudioQuality.get_all_files(files, SuperAudioFormat.MP3)
         available_quality = [
             AudioQualityPatched.VERY_HIGH,
@@ -151,22 +151,26 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
         ]
         for quality in available_quality:
             collected_valid_audio.append(self.get_audio(vorbis_files, quality))
-            # collected_valid_audio.append(self.get_audio(aac_files, self.preferred))
+            collected_valid_audio.append(self.get_audio(aac_files, quality))
             collected_valid_audio.append(self.get_audio(mp3_files, quality))
 
         as_string_format: List[str] = []
         for audio in collected_valid_audio:
+            if audio is None:
+                continue
             if not audio.HasField("format"):
                 continue
             audio_fmt = SuperAudioFormat.get(audio.format).name.lower()
-            audio_qual = (
-                AudioQualityPatched.get_quality(audio.format)
-                .name.replace("NORMAL", "LOW")
-                .replace("HIGH", "NORMAL")
-                .replace("VERY_HIGH", "HIGH")
-                .lower()
-            )
+            audio_qual_raw = AudioQualityPatched.get_quality(audio.format)
+            audio_qual = None
+            if audio_qual_raw == AudioQualityPatched.NORMAL:
+                audio_qual = "low"
+            if audio_qual_raw == AudioQualityPatched.HIGH:
+                audio_qual = "normal"
+            elif audio_qual_raw == AudioQualityPatched.VERY_HIGH:
+                audio_qual = "high"
             as_string_format.append(f"{audio_fmt}_{audio_qual}")
+        as_string_format.sort(key=lambda x: x.split("_")[0])
         return as_string_format
 
     def get_file(self, files: List[Metadata.AudioFile]) -> Optional[Metadata.AudioFile]:
