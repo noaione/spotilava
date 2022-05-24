@@ -106,7 +106,12 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
                     self._selected_format = "mp3"
                 elif sel_fmt in ["vorbis", "ogg", "opus"]:
                     self._selected_format = "vorbis"
+                elif sel_fmt in ["any", "all", "auto"]:
+                    self._selected_format = "any"
+            self._raw_prefer = preferred
             preferred = AudioQualityPatched.from_string(preferred)
+        else:
+            self._raw_prefer = preferred
         self.preferred: AudioQualityPatched = preferred
         if not isinstance(preferred, AudioQualityPatched):
             self.preferred: AudioQualityPatched = AudioQualityPatched.from_super(preferred)

@@ -11,7 +11,7 @@ from internals.utils import requested_format, requested_quality
 logger = logging.getLogger("Routes.Tracks")
 
 tracks_bp = SpotilavaBlueprint("spotify-tracks", url_prefix="/")
-AVAILABLE_FORMAT = ["vorbis", "mp3", "aac", "m4a", "ogg"]
+AVAILABLE_FORMAT = ["vorbis", "mp3", "aac", "m4a", "ogg", "auto"]
 AVAILABLE_QUALITY = ["lowest", "low", "medium", "normal", "high", "highest"]
 
 
@@ -49,10 +49,10 @@ async def get_track_metadata(request: sanic.Request, track_id: str) -> HTTPRespo
 
 @tracks_bp.route("/<track_id>/listen", methods=["GET", "HEAD"])
 async def get_track_listen(request: sanic.Request, track_id: str):
-    req_fmt = requested_format(request.args, "vorbis").lower()
+    req_fmt = requested_format(request.args, "auto").lower()
     req_quality = requested_quality(request.args, "highest").lower()
     if req_fmt not in AVAILABLE_FORMAT:
-        return text("Unknown format. (One of: mp3, aac, vorbis)", status=400)
+        return text("Unknown format. (One of: mp3, aac, vorbis, auto)", status=400)
     if req_quality not in AVAILABLE_QUALITY:
         return text("Unknown quality. (One of: lowest, low, medium, normal, high, highest)", status=400)
     app: SpotilavaSanic = request.app
