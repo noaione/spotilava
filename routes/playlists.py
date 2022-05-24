@@ -7,7 +7,7 @@ from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
 
 logger = logging.getLogger("Spotify.Playlists")
 
-playlists_bp = SpotilavaBlueprint("spotify:playlists", url_prefix="/")
+playlists_bp = SpotilavaBlueprint("spotify-playlists", url_prefix="/")
 
 
 @playlists_bp.get("/album/<album_id>")

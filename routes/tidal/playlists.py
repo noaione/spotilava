@@ -7,7 +7,7 @@ from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
 
 logger = logging.getLogger("Tidal.Playlists")
 
-tidal_playlists_bp = SpotilavaBlueprint("tidal:playlists", url_prefix="/tidal/")
+tidal_playlists_bp = SpotilavaBlueprint("tidal-playlists", url_prefix="/tidal/")
 
 
 @tidal_playlists_bp.get("/album/<album_id>")
