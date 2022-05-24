@@ -22,7 +22,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from typing import Union
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Union
+
+if TYPE_CHECKING:
+    from sanic.request import RequestParameters
 
 __all__ = (
     "get_indexed",
@@ -70,3 +75,20 @@ def complex_walk(dictionary: Union[dict, list], paths: str):
         except (TypeError, ValueError, IndexError, KeyError, AttributeError):
             return None
     return dictionary
+
+
+def requested_format(query_args: RequestParameters, fallback: str) -> str:
+    fmt_get = query_args.get(
+        "formats",
+        query_args.get("format", query_args.get("fmts", query_args.get("fmt", query_args.get("f", fallback)))),
+    )
+    if isinstance(fmt_get, (list, tuple)):
+        fmt_get = fmt_get[0]
+    return fmt_get
+
+
+def requested_quality(query_args: RequestParameters, fallback: str) -> str:
+    fmt_get = query_args.get("quality", query_args.get("q", fallback))
+    if isinstance(fmt_get, (list, tuple)):
+        fmt_get = fmt_get[0]
+    return fmt_get

@@ -6,10 +6,13 @@ from sanic.response import HTTPResponse, ResponseStream, json, raw, stream, text
 
 from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
 from internals.spotify import should_inject_metadata
+from internals.utils import requested_format, requested_quality
 
 logger = logging.getLogger("Routes.Tracks")
 
 tracks_bp = SpotilavaBlueprint("spotify-tracks", url_prefix="/")
+AVAILABLE_FORMAT = ["vorbis", "mp3", "aac", "m4a", "ogg"]
+AVAILABLE_QUALITY = ["lowest", "low", "medium", "normal", "high", "highest"]
 
 
 @tracks_bp.get("/<track_id>")
@@ -33,17 +36,25 @@ async def get_track_metadata(request: sanic.Request, track_id: str) -> HTTPRespo
         logger.warning(f"TrackMeta: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead")
         return json({"error": "Invalid track id, must be alphanumerical", "code": 400, "data": None}, status=500)
 
-    metadata = await app.spotify.get_track_metadata(track_id)
+    metadata, track_quality = await app.spotify.get_track_metadata(track_id)
     if metadata is None:
         logger.warning(f"TrackMeta: Unable to find track <{track_id}>")
         return json({"error": "Track not found.", "code": 404, "data": None}, status=404)
 
     logger.info(f"TrackMeta: Sending track <{track_id}> metadata")
-    return json({"error": "Success", "code": 200, "data": metadata.to_json()}, status=200, ensure_ascii=False)
+    metadata_json = metadata.to_json()
+    metadata_json["available_formats"] = track_quality
+    return json({"error": "Success", "code": 200, "data": metadata_json}, status=200, ensure_ascii=False)
 
 
 @tracks_bp.route("/<track_id>/listen", methods=["GET", "HEAD"])
 async def get_track_listen(request: sanic.Request, track_id: str):
+    req_fmt = requested_format(request.args, "vorbis").lower()
+    req_quality = requested_quality(request.args, "highest").lower()
+    if req_fmt not in AVAILABLE_FORMAT:
+        return text("Unknown format. (One of: mp3, aac, vorbis)", status=400)
+    if req_quality not in AVAILABLE_QUALITY:
+        return text("Unknown quality. (One of: lowest, low, medium, normal, high, highest)", status=400)
     app: SpotilavaSanic = request.app
     CHUNK_SIZE = app.chunk_size
     meth = request.method.lower()
@@ -58,7 +69,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         logger.warning(f"TrackListen: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead")
         return text("Invalid track id.", status=400)
 
-    find_track = await app.spotify.get_track(track_id)
+    find_track = await app.spotify.get_track(track_id, req_quality, req_fmt)
     if find_track is None:
         logger.warning(f"TrackListen: Unable to find track <{track_id}>")
         if meth == "head":

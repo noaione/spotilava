@@ -31,7 +31,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 from time import time as ctime
-from typing import List, Literal, Optional, Tuple
+from typing import List, Literal, Optional, Tuple, Union
 from urllib.parse import quote_plus as url_quote
 
 import aiohttp
@@ -49,6 +49,7 @@ from internals.errors import NoAudioFound, NoTrackFound
 from internals.utils import complex_walk
 
 from .models import *
+from .tracks import AutoFallbackAudioQuality
 
 BASE_DIR = Path(__file__).absolute().parent.parent.parent
 _log = logging.getLogger("Internals.Spotify")
@@ -185,6 +186,22 @@ class SpotifySessionAsync(SpotifySession):
         task.add_done_callback(self._reconnect_done)
         self._actual_reconnect_task = task
 
+    async def get_track_format(self, track_id_or_track: Union[TrackId, Metadata.Track]):
+        if type(track_id_or_track) is TrackId:
+            original = await self._loop.run_in_executor(
+                None,
+                self.api().get_metadata_4_track,
+                track_id_or_track,
+            )
+            track: Metadata.Track = self.content_feeder().pick_alternative_if_necessary(original)
+            if track is None:
+                raise RuntimeError("Cannot get any alternative track!")
+        else:
+            track: Metadata.Track = track_id_or_track
+        fmt_parser = AutoFallbackAudioQuality(AudioQuality.VERY_HIGH)
+        all_formats = fmt_parser.get_as_string(track.file)
+        return all_formats
+
 
 class LIBRESpotifyWrapper:
     def __init__(self, username: str, password: str, *, loop: asyncio.AbstractEventLoop = None):
@@ -238,15 +255,26 @@ class LIBRESpotifyWrapper:
         self.logger.info("Spotify: Authenticated")
         self.session = session
 
-    async def get_track(self, track_id: str):
+    async def get_track(self, track_id: str, audio_quality: Optional[str] = None, audio_format: Optional[str] = None):
         track_real = TrackId.from_uri(f"spotify:track:{track_id}")
         self.logger.info(f"SpotifyTrack: Fetching track <{track_id}>")
+        fmt_string = None
+        if audio_quality is not None:
+            fmt_string = audio_quality
+        if fmt_string is None and audio_format is not None:
+            fmt_string = f"highest//{audio_format}"
+        elif fmt_string is not None and audio_format is not None:
+            fmt_string = f"{fmt_string}//{audio_format}"
+        if fmt_string is None:
+            fmt_string = AudioQuality.VERY_HIGH
+        self.logger.info(f"SpotifyTrack: Selected quality: {audio_quality or AudioQuality.VERY_HIGH}")
+        self.logger.info(f"SpotifyTrack: Selected format: {audio_format or 'vorbis'}")
         try:
             track = await self._loop.run_in_executor(
                 None,
                 self.session.content_feeder().load,
                 track_real,
-                AudioQuality.VERY_HIGH,
+                fmt_string,
                 False,
                 None,
             )
@@ -361,7 +389,31 @@ class LIBRESpotifyWrapper:
                     merged_items.extend(res.get("items", []))
         return merged_items
 
-    async def get_track_metadata(self, track_id: str) -> Optional[SpotifyTrack]:
+    async def _get_track_qualities(self, track_id: str):
+        track_real = TrackId.from_uri(f"spotify:track:{track_id}")
+        try:
+            return await self.session.get_track_format(track_real)
+        except NoAudioFound as naf:
+            self.logger.error(
+                f"SpotifyTrackQuality: Unable find suitable audio for {track_id}, "
+                "please report to maintainer with logs!",
+                exc_info=naf,
+            )
+            return []
+        except NoTrackFound:
+            self.logger.error(
+                f"SpotifyTrackQuality: No track (including alt track) found for {track_id}. "
+                "It's possible that your account cannot view this track at all."
+            )
+            return []
+        except RuntimeError as re:
+            self.logger.error(
+                f"SpotifyTrackQuality: RuntimeError while fetching track <{track_id}>, report to maintainer with logs!",
+                exc_info=re,
+            )
+            return []
+
+    async def get_track_metadata(self, track_id: str) -> Optional[Tuple[SpotifyTrack, List[str]]]:
         token = await self._get_token()
 
         header_token = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
@@ -374,8 +426,9 @@ class LIBRESpotifyWrapper:
                 data = await resp.json()
 
         if data:
-            return SpotifyTrack.from_track(data)
-        return None
+            track_qual = await self._get_track_qualities(track_id)
+            return SpotifyTrack.from_track(data), track_qual
+        return None, []
 
     async def get_base_url(self, service_type: str):
         svc_url = await self._loop.run_in_executor(None, ApResolver.get_random_of, service_type)
