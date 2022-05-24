@@ -2,14 +2,14 @@ import logging
 import re
 
 import sanic
-from sanic.response import HTTPResponse, StreamingHTTPResponse, json, raw, stream, text
+from sanic.response import HTTPResponse, ResponseStream, json, raw, stream, text
 
 from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
 from internals.spotify import should_inject_metadata
 
 logger = logging.getLogger("Routes.Tracks")
 
-tracks_bp = SpotilavaBlueprint("spotify:tracks", url_prefix="/")
+tracks_bp = SpotilavaBlueprint("spotify-tracks", url_prefix="/")
 
 
 @tracks_bp.get("/<track_id>")
@@ -108,7 +108,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
     should_check_bytes = True
     if end_read == -1:
         should_check_bytes = False
-        end_read = content_length
+        end_read = content_length or -1
 
     if start_read >= end_read and should_check_bytes:
         logger.warning(f"TrackListen: Sending empty track <{track_id}> since range is invalid")
@@ -129,7 +129,7 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         headers["Content-Length"] = str(end_read - start_read)
 
     # Streaming function
-    async def track_stream(response: StreamingHTTPResponse):
+    async def track_stream(response: ResponseStream):
         maximum_read = find_track.input_stream.available()
         logger.info(f"TrackListen: Streaming track <{track_id}> with bytes {start_read}-{end_read}")
         if start_read == 0:
