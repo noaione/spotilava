@@ -67,6 +67,14 @@ In `.env.example` you will find 3 options:
 - `/episode/:episode_id` get the metadata of a podcast episode. (JSON)
 - `/episode/:episode_id/listen` get the episode itself, returns an OGG Vorbis or MP3 stream. (Binary)
 
+You can now manually select preferred format and quality.
+- `q` or `quality` parameter will select the preferred audio quality (available: `high`, `normal`, `low`, `lowest`, `highest`)
+- `fmt` or `format` parameter will select the preferred audio format (available: `vorbis`, `aac`, `mp3`, `auto`)
+
+You can find the available format by using the `/:track_id` route, the format are like this: `FORMAT_QUALITY`
+
+The default for Spotify are: `auto` and `highest`
+
 The other API can be used to fetch about playlist/album/track information before requesting lavaplayer the real URL (`/:track_id/listen`).
 
 ~~I'm planning to implement support for Shows/Podcast too.~~
