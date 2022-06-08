@@ -334,6 +334,11 @@ class LIBRESpotifyWrapper:
         except BrokenPipeError:
             self.logger.warning("Spotify: The pipe to API is broken, reconnecting...")
             await self._force_reconnect()
+            return await self._get_token()
+        except OSError as oserr:
+            self.logger.warning("Spotify: OSError while fetching token provider, reconnecting...", exc_info=oserr)
+            await self._force_reconnect()
+            return await self._get_token()
 
         self.logger.info("Spotify: Fetching token for playlist-read")
         try:
@@ -341,6 +346,11 @@ class LIBRESpotifyWrapper:
         except BrokenPipeError:
             self.logger.warning("Spotify: The pipe to API is broken, reconnecting...")
             await self._force_reconnect()
+            return await self._get_token()
+        except OSError:
+            self.logger.warning("Spotify: The pipe to API is broken, reconnecting...")
+            await self._force_reconnect()
+            return await self._get_token()
         return token.access_token
 
     async def _fetch_all_tracks(self, next: str, token: str):
