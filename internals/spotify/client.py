@@ -159,8 +159,9 @@ class SpotifySessionAsync(SpotifySession):
         except Exception:
             self.logger.info("SpotifyReconnect: Reauthenticated!")
 
-    def _reconnect_done(self):
+    def _reconnect_done(self, task: asyncio.Task):
         self.logger.info("Connection reestablished again, removing task...")
+        self.logger.info(f"{task!r}")
         self._is_reconnection_ready.set()
         if self._actual_reconnect_task:
             self._actual_reconnect_task = None
@@ -181,7 +182,9 @@ class SpotifySessionAsync(SpotifySession):
         self._is_reconnection_ready.clear()
         self.logger.info("Reconnecting to Spotify API with task...")
         dt = int(ctime())
-        task = self._loop.create_task(self._reconnect(), name=f"librespot-reconnect-{dt}")
+        # Initiate reconnection task with super().reconnect
+        wrapper = self._loop.run_in_executor(None, super().reconnect)
+        task = self._loop.create_task(wrapper, name=f"librespot-reconnect-wrap-{dt}")
         task.add_done_callback(self._reconnect_done)
         self._actual_reconnect_task = task
 
