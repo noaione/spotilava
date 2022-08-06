@@ -1,5 +1,5 @@
 # General requirements
-sanic==22.3.2
+sanic==22.6.1
 python-dotenv==0.20.0
 mutagen==1.45.1
 aiohttp==3.8.1
