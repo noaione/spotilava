@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from textwrap import dedent
 
 import coloredlogs
 import sanic
@@ -104,7 +105,29 @@ app.chunk_size = CHUNK_SIZE
 
 @app.get("/")
 async def index(request: sanic.Request) -> HTTPResponse:
-    return text("</>")
+    return text(
+        dedent(
+            """
+            Now serving...
+            Spotilava v1.1.0
+
+                - /<track_id>
+                - /<track_id>/listen
+                - /<track_id>/lyrics
+                - /episodes/<episode_id>
+                - /episodes/<episode_id>/listen
+
+                - /album/<album_id>
+                - /playlist/<playlist_id>
+                - /show/<show_id>
+                - /artist/<artist_id>
+
+                - /meta/region
+
+            </> Created by noaione </>
+            """
+        ).strip()
+    )
 
 
 @app.get("/favicon.ico")
@@ -125,8 +148,13 @@ if os.getenv("ENABLE_TIDAL", "0") == "1":
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Spotilava Web Server")
+    parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode")
+    args = parser.parse_args()
     try:
-        app.run("0.0.0.0", PORT)
+        app.run("0.0.0.0", PORT, debug=args.debug)
     except KeyboardInterrupt:
         logger.info("Shutting down...")
         app.spotify.clsoe()
