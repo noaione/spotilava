@@ -1,11 +1,20 @@
+import logging
 from types import SimpleNamespace
-from typing import Optional
+from typing import Any, Callable, Coroutine, Dict, Optional
 
-from sanic import Sanic
+from sanic import Request, Sanic
 from sanic.blueprints import Blueprint
+from sanic.response import HTTPResponse
 
 from .spotify import LIBRESpotifyWrapper
 from .tidal import TidalAPI
+
+logger = logging.getLogger("Internals.Sanic")
+__all__ = (
+    "SpotilavaSanic",
+    "SpotilavaBlueprint",
+    "stream_response",
+)
 
 
 class SpotilavaContext(SimpleNamespace):
@@ -55,3 +64,27 @@ class SpotilavaBlueprint(Blueprint):
     def app(self) -> SpotilavaSanic:
         apps = self._apps
         return apps[0]
+
+
+async def stream_response(
+    request: Request,
+    callback: Callable[[HTTPResponse], Coroutine[Any, Any, None]],
+    status: int = 200,
+    content_type: Optional[str] = None,
+    headers: Optional[Dict[str, Any]] = None,
+):
+    response = await request.respond(
+        status=status,
+        content_type=content_type,
+        headers=headers,
+    )
+
+    try:
+        await callback(response)
+    except Exception as e:
+        logger.exception(f"Error while streaming response: {e}", exc_info=e)
+        await response.eof()
+        # reraise the exception
+        raise e
+    else:
+        await response.eof()

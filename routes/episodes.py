@@ -2,9 +2,9 @@ import logging
 import re
 
 import sanic
-from sanic.response import HTTPResponse, ResponseStream, json, raw, stream, text
+from sanic.response import HTTPResponse, json, raw, text
 
-from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
+from internals.sanic import SpotilavaBlueprint, SpotilavaSanic, stream_response
 from internals.spotify import should_inject_metadata
 
 logger = logging.getLogger("Routes.Episodes")
@@ -13,7 +13,7 @@ episodes_bp = SpotilavaBlueprint("spotify-episodes", url_prefix="/episode")
 
 
 @episodes_bp.get("/<episode_id>")
-async def get_episode_metadata(request: sanic.Request, episode_id: str) -> HTTPResponse:
+async def get_episode_metadata(request: sanic.Request, episode_id: str):
     app: SpotilavaSanic = request.app
     logger.info(f"EpisodeMeta: Received request for episode <{episode_id}>")
     if not app.spotify:
@@ -137,11 +137,11 @@ async def get_episode_listen(request: sanic.Request, episode_id: str) -> HTTPRes
         headers["Content-Length"] = str(end_read - start_read)
 
     # Streaming function
-    async def episode_stream(response: ResponseStream):
+    async def episode_stream(response: HTTPResponse):
         maximum_read = episode_info.input_stream.available()
         logger.info(f"EpisodeListen: Streaming track <{episode_id}> with bytes {start_read}-{end_read}")
         if start_read == 0:
-            await response.write(first_data)
+            await response.send(first_data)
         else:
             # Seek to target start
             logger.debug(f"EpisodeListen: Seeking to bytes {start_read} in <{episode_id}>")
@@ -153,20 +153,15 @@ async def get_episode_listen(request: sanic.Request, episode_id: str) -> HTTPRes
                 THIS_MUCH = maximum_read
             data = await episode_info.read_bytes(THIS_MUCH)
             maximum_read -= len(data)
-            await response.write(data)
+            await response.send(data)
         # Pad with silence frame if it's ogg
         if "ogg" in file_ext:
-            await response.write(extra_frame)
+            await response.send(extra_frame)
         try:
             await episode_info.close()
         except Exception as e:
             logger.error(f"EpisodeListen: Error closing track <{episode_id}>", exc_info=e)
 
     logger.info(f"EpisodeListen: Sending episode <{episode_id}>")
-    # OGG vorbis stream
-    return stream(
-        episode_stream,
-        status=200,
-        content_type=content_type,
-        headers=headers,
-    )
+    # Stream track to client
+    return await stream_response(request, episode_stream, status=200, content_type=content_type, headers=headers)

@@ -2,9 +2,9 @@ import logging
 from io import BytesIO
 
 import sanic
-from sanic.response import HTTPResponse, ResponseStream, json, stream, text
+from sanic.response import HTTPResponse, json, text
 
-from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
+from internals.sanic import SpotilavaBlueprint, SpotilavaSanic, stream_response
 from internals.tidal import should_inject_metadata
 
 logger = logging.getLogger("Routes.Tidal.Tracks")
@@ -73,15 +73,16 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         first_data, content_type, file_ext = should_inject_metadata(first_data, track)
 
     # Streaming function
-    async def track_stream(response: ResponseStream):
+    async def track_stream(response: HTTPResponse):
         if complete_data is not None:
             complete_data.seek(0)
-            await response.write(complete_data.read())
+            await response.send(complete_data.read())
+            complete_data.flush()
         else:
-            await response.write(first_data)
+            await response.send(first_data)
             while not track.empty():
                 data = await track.read_bytes(CHUNK_SIZE)
-                await response.write(data)
+                await response.send(data)
 
     headers = {
         "Content-Disposition": f'inline; filename="track_{track_id}{file_ext}"',
@@ -94,10 +95,5 @@ async def get_track_listen(request: sanic.Request, track_id: str):
             headers["Content-Type"] = len(first_data) + available
 
     logger.info(f"TrackListen: Sending track <{track_id}>")
-    # OGG vorbis stream
-    return stream(
-        track_stream,
-        status=200,
-        content_type=content_type,
-        headers=headers,
-    )
+    # Stream track to client
+    return await stream_response(request, track_stream, status=200, content_type=content_type, headers=headers)

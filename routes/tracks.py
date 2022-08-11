@@ -2,9 +2,9 @@ import logging
 import re
 
 import sanic
-from sanic.response import HTTPResponse, ResponseStream, json, raw, stream, text
+from sanic.response import HTTPResponse, json, raw, text
 
-from internals.sanic import SpotilavaBlueprint, SpotilavaSanic
+from internals.sanic import SpotilavaBlueprint, SpotilavaSanic, stream_response
 from internals.spotify import should_inject_metadata
 
 logger = logging.getLogger("Routes.Tracks")
@@ -129,11 +129,11 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         headers["Content-Length"] = str(end_read - start_read)
 
     # Streaming function
-    async def track_stream(response: ResponseStream):
+    async def track_stream(response: HTTPResponse):
         maximum_read = find_track.input_stream.available()
         logger.info(f"TrackListen: Streaming track <{track_id}> with bytes {start_read}-{end_read}")
         if start_read == 0:
-            await response.write(first_data)
+            await response.send(first_data)
         else:
             # Seek to target start
             logger.debug(f"TrackListen: Seeking to bytes {start_read} in <{track_id}>")
@@ -145,23 +145,18 @@ async def get_track_listen(request: sanic.Request, track_id: str):
                 THIS_MUCH = maximum_read
             data = await find_track.read_bytes(THIS_MUCH)
             maximum_read -= len(data)
-            await response.write(data)
+            await response.send(data)
         # Pad with silence frame if it's ogg
         if "ogg" in file_ext:
-            await response.write(extra_frame)
+            await response.send(extra_frame)
         try:
             await find_track.close()
         except Exception as e:
             logger.error(f"TrackListen: Error closing track <{track_id}>", exc_info=e)
 
     logger.info(f"TrackListen: Sending track <{track_id}>")
-    # OGG vorbis stream
-    return stream(
-        track_stream,
-        status=200,
-        content_type=content_type,
-        headers=headers,
-    )
+    # Stream track to client
+    return await stream_response(request, track_stream, status=200, content_type=content_type, headers=headers)
 
 
 @tracks_bp.get("/<track_id>/lyrics")
