@@ -52,6 +52,7 @@ def get_spotify_audio_quality(request: Request) -> Optional[AudioQuality]:
     quality_mappings = {
         "lowest": AudioQuality.NORMAL,
         "low": AudioQuality.NORMAL,
+        "lq": AudioQuality.NORMAL,
         "medium": AudioQuality.HIGH,
         "normal": AudioQuality.HIGH,
         "high": AudioQuality.VERY_HIGH,
