@@ -174,6 +174,11 @@ class SpotifySessionAsync(SpotifySession):
         if self._actual_reconnect_task:
             self._actual_reconnect_task.cancel()
 
+    async def _reconnect_async(self):
+        self.logger.info("SpotifyReconnect: Reconnecting...")
+        await self._loop.run_in_executor(None, super().reconnect)
+        self.logger.info("SpotifyReconnect: Reconnected!")
+
     def reconnect(self) -> None:
         """
         Reconnect to the Spotify API.
@@ -183,8 +188,9 @@ class SpotifySessionAsync(SpotifySession):
         self.logger.info("Reconnecting to Spotify API with task...")
         dt = int(ctime())
         # Initiate reconnection task with super().reconnect
-        wrapper = self._loop.run_in_executor(None, super().reconnect)
-        task = self._loop.create_task(wrapper, name=f"librespot-reconnect-wrap-{dt}")
+        # Execute above future wrapper in task, dont use create_task since
+        # it only accept coroutines
+        task = self._loop.create_task(self._reconnect_async(), name=f"librespot-reconnect-wrap-{dt}")
         task.add_done_callback(self._reconnect_done)
         self._actual_reconnect_task = task
 
