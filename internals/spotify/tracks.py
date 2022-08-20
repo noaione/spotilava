@@ -34,6 +34,8 @@ from librespot.audio import SuperAudioFormat
 from librespot.proto import Metadata_pb2 as Metadata
 from librespot.structure import AudioQualityPicker
 
+from .shims import SpotifyAudioFormat
+
 __all__ = ("AutoFallbackAudioQuality",)
 
 
@@ -82,7 +84,7 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
     logger = logging.getLogger("Spotilava:Player:AutoFallbackAudioQuality")
     preferred: AudioQualityPatched
 
-    def __init__(self, preferred: AudioQualityPatched) -> None:
+    def __init__(self, preferred: AudioQualityPatched, force_format: Optional[SpotifyAudioFormat] = None) -> None:
         self.preferred: AudioQualityPatched = preferred
         if not isinstance(preferred, AudioQualityPatched):
             self.preferred: AudioQualityPatched = AudioQualityPatched.from_super(preferred)
@@ -92,6 +94,8 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
             AudioQualityPatched.NORMAL,
         ]
         self.other_quality.remove(self.preferred)
+
+        self._force_format: Optional[SpotifyAudioFormat] = force_format
 
     @staticmethod
     def get_all_files(files: List[Metadata.AudioFile], format: SuperAudioFormat) -> List[Metadata.AudioFile]:

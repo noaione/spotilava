@@ -7,6 +7,8 @@ from sanic.response import HTTPResponse, json, raw, text
 from internals.sanic import SpotilavaBlueprint, SpotilavaSanic, stream_response
 from internals.spotify import should_inject_metadata
 
+from ._utils import get_spotify_audio_format, get_spotify_audio_quality
+
 logger = logging.getLogger("Routes.Episodes")
 
 episodes_bp = SpotilavaBlueprint("spotify-episodes", url_prefix="/episode")
@@ -66,7 +68,9 @@ async def get_episode_listen(request: sanic.Request, episode_id: str) -> HTTPRes
         )
         return text("Invalid episode id.", status=400)
 
-    episode_info = await app.spotify.get_episode(episode_id)
+    force_format = get_spotify_audio_format(request)
+    force_quality = get_spotify_audio_quality(request)
+    episode_info = await app.spotify.get_episode(episode_id, force_format, force_quality)
     if episode_info is None:
         logger.warning(f"EpisodeListen: Unable to find episode <{episode_id}>")
         if meth == "head":
