@@ -109,6 +109,8 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
             if file.HasField("format") and SuperAudioFormat.get(file.format) == format:
                 if self._force_format is not None and self._force_format == format:
                     valid_files.append(file)
+                elif self._force_format is None:
+                    valid_files.append(file)
         return valid_files
 
     def get_audio(self, files: List[Metadata.AudioFile], preferred: AudioQualityPatched) -> Metadata.AudioFile:
@@ -126,20 +128,22 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
             return fmt
 
     def get_file(self, files: List[Metadata.AudioFile]) -> Optional[Metadata.AudioFile]:
-        # Note: AAC files currently are broken.
+        # XXX: AAC files currently are broken.
         vorbis_files = self.get_all_files(files, SuperAudioFormat.VORBIS)
-        # aac_files = self.get_all_files(files, SuperAudioFormat.AAC)
+        aac_files: List[Metadata.AudioFile] = []
+        if self._force_format == SpotifyAudioFormat.AAC:
+            aac_files = self.get_all_files(files, SuperAudioFormat.AAC)
         mp3_files = self.get_all_files(files, SuperAudioFormat.MP3)
 
         collected_valid_audio: List[Optional[Metadata.AudioFile]] = []
         collected_valid_audio.append(self.get_audio(vorbis_files, self.preferred))
-        # collected_valid_audio.append(self.get_audio(aac_files, self.preferred))
+        collected_valid_audio.append(self.get_audio(aac_files, self.preferred))
         collected_valid_audio.append(self.get_audio(mp3_files, self.preferred))
 
         if not self._force_quality:
             for other_fmt in self.other_quality:
                 collected_valid_audio.append(self.get_audio(vorbis_files, other_fmt))
-                # collected_valid_audio.append(self.get_audio(aac_files, other_fmt))
+                collected_valid_audio.append(self.get_audio(aac_files, other_fmt))
                 collected_valid_audio.append(self.get_audio(mp3_files, other_fmt))
 
         collected_valid_audio = list(filter(lambda x: x is not None, collected_valid_audio))

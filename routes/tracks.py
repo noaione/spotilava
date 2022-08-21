@@ -84,6 +84,8 @@ async def get_track_listen(request: sanic.Request, track_id: str):
             end_read = range_search.group("end")
             if end_read is not None:
                 end_read = int(end_read)
+    if end_read is None:
+        end_read = -1
 
     logger.debug(f"TrackListen: Reading first {CHUNK_SIZE} bytes of <{track_id}>")
     first_data = await find_track.read_bytes(CHUNK_SIZE)

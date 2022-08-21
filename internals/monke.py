@@ -66,7 +66,7 @@ def load_track_with_fallback(
     selected_audio = AutoFallbackAudioQuality(audio_quality, force_format, force_quality).get_file(track.file)
     if selected_audio is None:
         self.logger.fatal("Couldn't find any suitable audio file: available: {}".format(track.file))
-        raise NoAudioFound
+        raise NoAudioFound(track.file)
     return self.load_stream(selected_audio, track, None, preload, halt_listener)
 
 
@@ -87,7 +87,7 @@ def load_episode_with_fallback(
     selected_audio = AutoFallbackAudioQuality(audio_quality, force_format, force_quality).get_file(episode.audio)
     if selected_audio is None:
         self.logger.fatal("Couldn't find any suitable audio file: available: {}".format(episode.audio))
-        raise NoAudioFound
+        raise NoAudioFound(episode.file)
     return self.load_stream(selected_audio, None, episode, preload, halt_listener)
 
 
