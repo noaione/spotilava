@@ -7,6 +7,8 @@ from sanic.response import HTTPResponse, json, raw, text
 from internals.sanic import SpotilavaBlueprint, SpotilavaSanic, stream_response
 from internals.spotify import should_inject_metadata
 
+from ._utils import get_spotify_audio_format, get_spotify_audio_quality
+
 logger = logging.getLogger("Routes.Tracks")
 
 tracks_bp = SpotilavaBlueprint("spotify-tracks", url_prefix="/")
@@ -58,7 +60,9 @@ async def get_track_listen(request: sanic.Request, track_id: str):
         logger.warning(f"TrackListen: Track <{track_id}> is invalid, expected alphanumeric, got {track_id} instead")
         return text("Invalid track id.", status=400)
 
-    find_track = await app.spotify.get_track(track_id)
+    force_format = get_spotify_audio_format(request)
+    force_quality = get_spotify_audio_quality(request)
+    find_track = await app.spotify.get_track(track_id, force_format, force_quality)
     if find_track is None:
         logger.warning(f"TrackListen: Unable to find track <{track_id}>")
         if meth == "head":
@@ -80,6 +84,8 @@ async def get_track_listen(request: sanic.Request, track_id: str):
             end_read = range_search.group("end")
             if end_read is not None:
                 end_read = int(end_read)
+    if end_read is None:
+        end_read = -1
 
     logger.debug(f"TrackListen: Reading first {CHUNK_SIZE} bytes of <{track_id}>")
     first_data = await find_track.read_bytes(CHUNK_SIZE)

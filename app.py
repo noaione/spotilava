@@ -109,7 +109,7 @@ async def index(request: sanic.Request) -> HTTPResponse:
         dedent(
             """
             Now serving...
-            Spotilava v1.1.0
+            Spotilava v1.2.0
 
                 - /<track_id>
                 - /<track_id>/listen

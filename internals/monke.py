@@ -26,7 +26,7 @@ Some monkeypatching for librespot.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Type, Union
+from typing import TYPE_CHECKING, Optional, Type, Union
 
 import librespot.audio
 from librespot.audio import CdnFeedHelper
@@ -41,6 +41,8 @@ if TYPE_CHECKING:
     from librespot.proto import Metadata_pb2 as Metadata
     from librespot.structure import HaltListener
 
+    from .spotify.shims import SpotifyAudioFormat
+
 
 def load_track_with_fallback(
     self: Type[PlayableContentFeeder],
@@ -48,6 +50,8 @@ def load_track_with_fallback(
     audio_quality: AudioQuality,
     preload: bool,
     halt_listener: HaltListener,
+    force_format: Optional[SpotifyAudioFormat] = None,
+    force_quality: bool = False,
 ):
     session: Session = getattr(self, "__session", getattr(self, "_PlayableContentFeeder__session", None))
     if type(track_id_or_track) is TrackId:
@@ -59,10 +63,10 @@ def load_track_with_fallback(
     else:
         track = track_id_or_track
 
-    selected_audio = AutoFallbackAudioQuality(audio_quality).get_file(track.file)
+    selected_audio = AutoFallbackAudioQuality(audio_quality, force_format, force_quality).get_file(track.file)
     if selected_audio is None:
         self.logger.fatal("Couldn't find any suitable audio file: available: {}".format(track.file))
-        raise NoAudioFound
+        raise NoAudioFound(track.file)
     return self.load_stream(selected_audio, track, None, preload, halt_listener)
 
 
@@ -72,16 +76,18 @@ def load_episode_with_fallback(
     audio_quality: AudioQuality,
     preload: bool,
     halt_listener: HaltListener,
+    force_format: Optional[SpotifyAudioFormat] = None,
+    force_quality: bool = False,
 ):
     session: Session = getattr(self, "__session", getattr(self, "_PlayableContentFeeder__session", None))
     episode = session.api().get_metadata_4_episode(episode_id)
     if episode.external_url:
         return CdnFeedHelper.load_episode_external(session, episode, halt_listener)
 
-    selected_audio = AutoFallbackAudioQuality(audio_quality).get_file(episode.audio)
+    selected_audio = AutoFallbackAudioQuality(audio_quality, force_format, force_quality).get_file(episode.audio)
     if selected_audio is None:
         self.logger.fatal("Couldn't find any suitable audio file: available: {}".format(episode.audio))
-        raise NoAudioFound
+        raise NoAudioFound(episode.file)
     return self.load_stream(selected_audio, None, episode, preload, halt_listener)
 
 
@@ -92,11 +98,17 @@ def monkeypatch_load():
         audio_quality: AudioQuality,
         preload: bool,
         halt_listener: HaltListener,
+        force_format: Optional[SpotifyAudioFormat] = None,
+        force_quality: bool = False,
     ):
         if type(playable_id) is TrackId:
-            return load_track_with_fallback(self, playable_id, audio_quality, preload, halt_listener)
+            return load_track_with_fallback(
+                self, playable_id, audio_quality, preload, halt_listener, force_format, force_quality
+            )
         elif type(playable_id) is EpisodeId:
-            return load_episode_with_fallback(self, playable_id, audio_quality, preload, halt_listener)
+            return load_episode_with_fallback(
+                self, playable_id, audio_quality, preload, halt_listener, force_format, force_quality
+            )
         else:
             raise TypeError("Unknown content: {}".format(playable_id))
 

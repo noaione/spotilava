@@ -59,6 +59,15 @@ In `.env.example` you will find 3 options:
 
 - `/:track_id` get the metadata of the track ID. (JSON)
 - `/:track_id/listen` get the track itself, returns the OGG Vorbis or MP3 stream. (Binary)
+  - Support overriding return format and quality (using query parameter)
+    - `q` parameter to adjust quality (`quality`, `qual`)
+    	- `low` for the lowest quality (`lowest`, `lq`)
+    	- `normal` for the "normal" or "high" quality (`medium`)
+    	- `high` for the highest quality (`highest`, `hq`)
+    - `format` parameter to adjust format (`fmt`)
+    	- `mp3` to force MP3 format
+    	- `aac` to force AAC format (`m4a`)
+    	- `vorbis` to force Vorbis format (`opus`, `ogg`)
 - `/:track_id/lyrics` get the track lyrics (if available) (JSON)
 - `/album/:album_id/` get the list of Album data. (JSON)
 - `/playlist/:playlist_id` get the list of playlist data. (JSON)
@@ -66,6 +75,15 @@ In `.env.example` you will find 3 options:
 - `/artist/:artist_id/` get the list of artist top tracks. (JSON) **[See note at the bottom]**
 - `/episode/:episode_id` get the metadata of a podcast episode. (JSON)
 - `/episode/:episode_id/listen` get the episode itself, returns an OGG Vorbis or MP3 stream. (Binary)
+  - Support overriding return format and quality (using query parameter)
+    - `q` parameter to adjust quality (`quality`, `qual`)
+    	- `low` for the lowest quality (`lowest`, `lq`)
+    	- `normal` for the "normal" or "high" quality (`medium`)
+    	- `high` for the highest quality (`highest`, `hq`)
+    - `format` parameter to adjust format (`fmt`)
+    	- `mp3` to force MP3 format
+    	- `aac` to force AAC format (`m4a`)
+    	- `vorbis` to force Vorbis format (`opus`, `ogg`)
 
 The other API can be used to fetch about playlist/album/track information before requesting lavaplayer the real URL (`/:track_id/listen`).
 

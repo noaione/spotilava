@@ -25,6 +25,7 @@ SOFTWARE.
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import os
 from dataclasses import dataclass
@@ -49,6 +50,7 @@ from internals.errors import NoAudioFound, NoTrackFound
 from internals.utils import complex_walk
 
 from .models import *
+from .shims import SpotifyAudioFormat
 
 BASE_DIR = Path(__file__).absolute().parent.parent.parent
 _log = logging.getLogger("Internals.Spotify")
@@ -247,15 +249,27 @@ class LIBRESpotifyWrapper:
         self.logger.info("Spotify: Authenticated")
         self.session = session
 
-    async def get_track(self, track_id: str):
+    async def get_track(
+        self,
+        track_id: str,
+        force_format: Optional[SpotifyAudioFormat] = None,
+        force_quality: Optional[AudioQuality] = None,
+    ):
         track_real = TrackId.from_uri(f"spotify:track:{track_id}")
         self.logger.info(f"SpotifyTrack: Fetching track <{track_id}>")
+
+        extra_kwargs = {
+            "force_quality": force_quality is not None,
+        }
+        if force_format is not None:
+            extra_kwargs["force_format"] = force_format
+        EXECUTOR = functools.partial(self.session.content_feeder().load, force_format=force_format)
         try:
             track = await self._loop.run_in_executor(
                 None,
-                self.session.content_feeder().load,
+                EXECUTOR,
                 track_real,
-                AudioQuality.VERY_HIGH,
+                force_quality or AudioQuality.VERY_HIGH,
                 False,
                 None,
             )
@@ -286,15 +300,26 @@ class LIBRESpotifyWrapper:
             track_id, track.episode, track.track, init_stream, track.normalization_data, track.metrics, loop=self._loop
         )
 
-    async def get_episode(self, episode_id: str):
+    async def get_episode(
+        self,
+        episode_id: str,
+        force_format: Optional[SpotifyAudioFormat] = None,
+        force_quality: Optional[AudioQuality] = None,
+    ):
         episode_real = EpisodeId.from_uri(f"spotify:episode:{episode_id}")
         self.logger.info(f"SpotifyEpisode: Fetching episode <{episode_id}>")
+        extra_kwargs = {
+            "force_quality": force_quality is not None,
+        }
+        if force_format is not None:
+            extra_kwargs["force_format"] = force_format
+        EXECUTOR = functools.partial(self.session.content_feeder().load, force_format=force_format)
         try:
             episode = await self._loop.run_in_executor(
                 None,
-                self.session.content_feeder().load,
+                EXECUTOR,
                 episode_real,
-                AudioQuality.VERY_HIGH,
+                force_quality or AudioQuality.VERY_HIGH,
                 False,
                 None,
             )
