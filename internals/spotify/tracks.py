@@ -84,7 +84,12 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
     logger = logging.getLogger("Spotilava:Player:AutoFallbackAudioQuality")
     preferred: AudioQualityPatched
 
-    def __init__(self, preferred: AudioQualityPatched, force_format: Optional[SpotifyAudioFormat] = None) -> None:
+    def __init__(
+        self,
+        preferred: AudioQualityPatched,
+        force_format: Optional[SpotifyAudioFormat] = None,
+        force_quality: bool = False,
+    ) -> None:
         self.preferred: AudioQualityPatched = preferred
         if not isinstance(preferred, AudioQualityPatched):
             self.preferred: AudioQualityPatched = AudioQualityPatched.from_super(preferred)
@@ -95,14 +100,15 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
         ]
         self.other_quality.remove(self.preferred)
 
+        self._force_quality = force_quality
         self._force_format: Optional[SpotifyAudioFormat] = force_format
 
-    @staticmethod
-    def get_all_files(files: List[Metadata.AudioFile], format: SuperAudioFormat) -> List[Metadata.AudioFile]:
+    def get_all_files(self, files: List[Metadata.AudioFile], format: SuperAudioFormat) -> List[Metadata.AudioFile]:
         valid_files = []
         for file in files:
             if file.HasField("format") and SuperAudioFormat.get(file.format) == format:
-                valid_files.append(file)
+                if self._force_format is not None and self._force_format == format:
+                    valid_files.append(file)
         return valid_files
 
     def get_audio(self, files: List[Metadata.AudioFile], preferred: AudioQualityPatched) -> Metadata.AudioFile:
@@ -121,23 +127,24 @@ class AutoFallbackAudioQuality(AudioQualityPicker):
 
     def get_file(self, files: List[Metadata.AudioFile]) -> Optional[Metadata.AudioFile]:
         # Note: AAC files currently are broken.
-        vorbis_files = AutoFallbackAudioQuality.get_all_files(files, SuperAudioFormat.VORBIS)
-        # aac_files = AutoFallbackAudioQuality.get_all_files(files, SuperAudioFormat.AAC)
-        mp3_files = AutoFallbackAudioQuality.get_all_files(files, SuperAudioFormat.MP3)
+        vorbis_files = self.get_all_files(files, SuperAudioFormat.VORBIS)
+        # aac_files = self.get_all_files(files, SuperAudioFormat.AAC)
+        mp3_files = self.get_all_files(files, SuperAudioFormat.MP3)
 
         collected_valid_audio: List[Optional[Metadata.AudioFile]] = []
         collected_valid_audio.append(self.get_audio(vorbis_files, self.preferred))
         # collected_valid_audio.append(self.get_audio(aac_files, self.preferred))
         collected_valid_audio.append(self.get_audio(mp3_files, self.preferred))
 
-        for other_fmt in self.other_quality:
-            collected_valid_audio.append(self.get_audio(vorbis_files, other_fmt))
-            # collected_valid_audio.append(self.get_audio(aac_files, other_fmt))
-            collected_valid_audio.append(self.get_audio(mp3_files, other_fmt))
+        if not self._force_quality:
+            for other_fmt in self.other_quality:
+                collected_valid_audio.append(self.get_audio(vorbis_files, other_fmt))
+                # collected_valid_audio.append(self.get_audio(aac_files, other_fmt))
+                collected_valid_audio.append(self.get_audio(mp3_files, other_fmt))
 
         collected_valid_audio = list(filter(lambda x: x is not None, collected_valid_audio))
         if not collected_valid_audio:
-            self.logger.warning("Couldn't find any suitable matches, available {}")
+            self.logger.warning(f"Couldn't find any suitable matches, available {files!r}")
             return None
         select_fmt = collected_valid_audio[0]
         self.logger.info(f"Selected audio format {self._get_fmt_name(select_fmt.format)}")

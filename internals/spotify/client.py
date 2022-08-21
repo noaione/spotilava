@@ -252,13 +252,16 @@ class LIBRESpotifyWrapper:
         track_real = TrackId.from_uri(f"spotify:track:{track_id}")
         self.logger.info(f"SpotifyTrack: Fetching track <{track_id}>")
 
-        execute_this = self.session.content_feeder().load
+        extra_kwargs = {
+            "force_quality": force_quality is not None,
+        }
         if force_format is not None:
-            execute_this = functools.partial(execute_this, force_format=force_format)
+            extra_kwargs["force_format"] = force_format
+        EXECUTOR = functools.partial(self.session.content_feeder().load, force_format=force_format)
         try:
             track = await self._loop.run_in_executor(
                 None,
-                execute_this,
+                EXECUTOR,
                 track_real,
                 force_quality or AudioQuality.VERY_HIGH,
                 False,
@@ -299,13 +302,16 @@ class LIBRESpotifyWrapper:
     ):
         episode_real = EpisodeId.from_uri(f"spotify:episode:{episode_id}")
         self.logger.info(f"SpotifyEpisode: Fetching episode <{episode_id}>")
-        execute_this = self.session.content_feeder().load
+        extra_kwargs = {
+            "force_quality": force_quality is not None,
+        }
         if force_format is not None:
-            execute_this = functools.partial(execute_this, force_format=force_format)
+            extra_kwargs["force_format"] = force_format
+        EXECUTOR = functools.partial(self.session.content_feeder().load, force_format=force_format)
         try:
             episode = await self._loop.run_in_executor(
                 None,
-                execute_this,
+                EXECUTOR,
                 episode_real,
                 force_quality or AudioQuality.VERY_HIGH,
                 False,

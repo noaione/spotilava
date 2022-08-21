@@ -51,6 +51,7 @@ def load_track_with_fallback(
     preload: bool,
     halt_listener: HaltListener,
     force_format: Optional[SpotifyAudioFormat] = None,
+    force_quality: bool = False,
 ):
     session: Session = getattr(self, "__session", getattr(self, "_PlayableContentFeeder__session", None))
     if type(track_id_or_track) is TrackId:
@@ -62,7 +63,7 @@ def load_track_with_fallback(
     else:
         track = track_id_or_track
 
-    selected_audio = AutoFallbackAudioQuality(audio_quality, force_format).get_file(track.file)
+    selected_audio = AutoFallbackAudioQuality(audio_quality, force_format, force_quality).get_file(track.file)
     if selected_audio is None:
         self.logger.fatal("Couldn't find any suitable audio file: available: {}".format(track.file))
         raise NoAudioFound
@@ -76,13 +77,14 @@ def load_episode_with_fallback(
     preload: bool,
     halt_listener: HaltListener,
     force_format: Optional[SpotifyAudioFormat] = None,
+    force_quality: bool = False,
 ):
     session: Session = getattr(self, "__session", getattr(self, "_PlayableContentFeeder__session", None))
     episode = session.api().get_metadata_4_episode(episode_id)
     if episode.external_url:
         return CdnFeedHelper.load_episode_external(session, episode, halt_listener)
 
-    selected_audio = AutoFallbackAudioQuality(audio_quality, force_format).get_file(episode.audio)
+    selected_audio = AutoFallbackAudioQuality(audio_quality, force_format, force_quality).get_file(episode.audio)
     if selected_audio is None:
         self.logger.fatal("Couldn't find any suitable audio file: available: {}".format(episode.audio))
         raise NoAudioFound
