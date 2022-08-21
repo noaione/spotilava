@@ -98,11 +98,17 @@ def monkeypatch_load():
         audio_quality: AudioQuality,
         preload: bool,
         halt_listener: HaltListener,
+        force_format: Optional[SpotifyAudioFormat] = None,
+        force_quality: bool = False,
     ):
         if type(playable_id) is TrackId:
-            return load_track_with_fallback(self, playable_id, audio_quality, preload, halt_listener)
+            return load_track_with_fallback(
+                self, playable_id, audio_quality, preload, halt_listener, force_format, force_quality
+            )
         elif type(playable_id) is EpisodeId:
-            return load_episode_with_fallback(self, playable_id, audio_quality, preload, halt_listener)
+            return load_episode_with_fallback(
+                self, playable_id, audio_quality, preload, halt_listener, force_format, force_quality
+            )
         else:
             raise TypeError("Unknown content: {}".format(playable_id))
 
