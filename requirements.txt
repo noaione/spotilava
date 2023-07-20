@@ -2,7 +2,7 @@
 sanic==22.6.2
 python-dotenv==0.20.0
 mutagen==1.45.1
-aiohttp==3.8.1
+aiohttp==3.8.5
 
 # Spotify specific requirements
 git+https://github.com/kokarare1212/librespot-python.git@c47127fe7c320f5f49afeba8e2d5a5ff64610b4d#egg=librespot
